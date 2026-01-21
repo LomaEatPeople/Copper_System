@@ -1,0 +1,9 @@
+CREATE TABLE bills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bill_no TEXT UNIQUE,
+    copper_type TEXT,
+    weight REAL,
+    price_per_kg REAL,
+    total REAL,
+    status TEXT
+);
