@@ -14,16 +14,37 @@ def get_conn():
 # Copper Types
 # -------------------------
 def add_copper_type(name: str):
-    conn = get_conn()
+    conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO copper_types (name)
+        INSERT OR IGNORE INTO copper_types (name)
         VALUES (?)
     """, (name,))
 
     conn.commit()
     conn.close()
+
+def get_all_copper_types():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, name
+        FROM copper_types
+        ORDER BY id
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "name": row[1]
+        }
+        for row in rows
+    ]
 
 
 # -------------------------

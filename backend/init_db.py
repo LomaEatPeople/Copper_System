@@ -69,6 +69,9 @@ def init_db():
     conn.close()
     print("Database initialized successfully.")
 
+def get_conn():
+    return sqlite3.connect("copper.db")
+
 
 if __name__ == "__main__":
     init_db()
