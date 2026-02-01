@@ -1,16 +1,17 @@
 from fastapi import FastAPI
-from services.copper_service import get_all_copper_types
+from backend.routers import item
+from backend.services.item_service import get_all_item_types
 from services.weigh_service import add_weigh_record
 from services.receipt_service import create_receipt, cancel_receipt
-from routers import receipt, weigh, copper
+from routers import receipt, weigh
 from fastapi.middleware.cors import CORSMiddleware
 
 
-app = FastAPI(title="Copper System API")
+app = FastAPI(title="Parinya System API")
 
 app.include_router(weigh.router)
 app.include_router(receipt.router)
-app.include_router(copper.router)
+app.include_router(item.router)
 
 # อนุญาตให้ React เรียก
 app.add_middleware(
@@ -30,14 +31,14 @@ def root():
 def favicon():
     return {}
 
-@app.get("/copper-types")
-def list_copper_types():
-    return get_all_copper_types()
+@app.get("/item-types")
+def list_item_types():
+    return get_all_item_types()
 
 @app.post("/weigh")
-def weigh(copper_type_id: int, weight_kg: float):
+def weigh(item_type_id: int, weight_kg: float):
     record_id = add_weigh_record(
-        copper_type_id=copper_type_id,
+        item_type_id=item_type_id,
         weight_kg=weight_kg
     )
     return {"weigh_record_id": record_id}

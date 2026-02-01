@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 
-DB_NAME = "copper.db"
+DB_NAME = "parinya.db"
 
 
 def get_conn():
@@ -11,27 +11,28 @@ def get_conn():
 
 
 # -------------------------
-# Copper Types
+# Item Types
 # -------------------------
-def add_copper_type(name: str):
-    conn = sqlite3.connect(DB_NAME)
+def add_item_type(name: str):
+    conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT OR IGNORE INTO copper_types (name)
+        INSERT OR IGNORE INTO item_types (name)
         VALUES (?)
     """, (name,))
 
     conn.commit()
     conn.close()
 
-def get_all_copper_types():
+
+def get_all_item_types():   # ✅ เปลี่ยนชื่อให้ตรงระบบใหม่
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
         SELECT id, name
-        FROM copper_types
+        FROM item_types
         ORDER BY id
     """)
 
@@ -48,9 +49,9 @@ def get_all_copper_types():
 
 
 # -------------------------
-# Copper Prices
+# Item Prices
 # -------------------------
-def add_copper_price(copper_type_id: int, price_per_kg: float, effective_date=None):
+def add_item_price(item_type_id: int, price_per_kg: float, effective_date=None):
     if effective_date is None:
         effective_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -58,33 +59,33 @@ def add_copper_price(copper_type_id: int, price_per_kg: float, effective_date=No
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO copper_prices (copper_type_id, price_per_kg, effective_date)
+        INSERT INTO item_prices (item_type_id, price_per_kg, effective_date)
         VALUES (?, ?, ?)
-    """, (copper_type_id, price_per_kg, effective_date))
+    """, (item_type_id, price_per_kg, effective_date))
 
     conn.commit()
     conn.close()
 
 
-def get_latest_price(copper_type_id: int):
+def get_latest_price(item_type_id: int):
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
         SELECT id, price_per_kg
-        FROM copper_prices
-        WHERE copper_type_id = ?
+        FROM item_prices
+        WHERE item_type_id = ?
         ORDER BY effective_date DESC
         LIMIT 1
-    """, (copper_type_id,))
+    """, (item_type_id,))
 
     row = cur.fetchone()
     conn.close()
 
     if not row:
-        raise ValueError("No price found for this copper type")
+        raise ValueError("No price found for this item type")
 
     return {
-        "copper_price_id": row[0],
+        "item_price_id": row[0],
         "price_per_kg": row[1]
     }
