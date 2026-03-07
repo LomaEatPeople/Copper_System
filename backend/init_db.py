@@ -27,7 +27,6 @@ def init_db():
     CREATE TABLE IF NOT EXISTS items (
         item_id INTEGER PRIMARY KEY AUTOINCREMENT,
         item_name TEXT NOT NULL,
-        price_per_kg REAL NOT NULL,
         category_id INTEGER,
         FOREIGN KEY (category_id) REFERENCES categories(category_id)
     )
@@ -51,7 +50,8 @@ def init_db():
         user_id INTEGER,
         transaction_type TEXT NOT NULL,
         total_cost REAL NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'draft',
+        transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(user_id)
     )
     """)
@@ -59,11 +59,13 @@ def init_db():
     # transaction_items
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS transaction_items (
-        transaction_item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         transaction_id INTEGER,
         item_id INTEGER,
         weight REAL NOT NULL,
         price_per_kg REAL NOT NULL,
+        status TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
         FOREIGN KEY (item_id) REFERENCES items(item_id)
     )
