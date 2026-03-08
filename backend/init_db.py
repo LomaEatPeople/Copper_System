@@ -63,8 +63,7 @@ def init_db():
         transaction_id INTEGER,
         item_id INTEGER,
         weight REAL NOT NULL,
-        price_per_kg REAL NOT NULL,
-        status TEXT NOT NULL,
+        price_per_kg REAL NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
         FOREIGN KEY (item_id) REFERENCES items(item_id)

@@ -12,7 +12,7 @@ def read_items():
 def create_item_endpoint(item: ItemCreate):
     return create_item(item)
 
-@router.delete("/items/{id}")
+@router.delete("/delete/items/{id}")
 def delete_item_endpoint(item: ItemDelete):
 
     item = delete_item(item.item_id)

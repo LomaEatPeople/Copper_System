@@ -5,7 +5,9 @@ from services.transactions import (
     add_transaction_item,
     update_item_price,
     confirm_transaction,
-    get_transaction
+    get_transaction,
+    get_transaction_with_items,
+    delete_transaction
 )
 
 from schemas.transactions import TransactionCreate, TransactionItemCreate, PriceUpdate
@@ -42,9 +44,24 @@ def add_transaction_item_endpoint(id: int, item: TransactionItemCreate):
     )
   
 
-@router.patch("/transaction-items/{id}/price")
-def update_item_price_endpoint(id: int, price: PriceUpdate):
-    return update_item_price(id, price.price_per_kg)
+@router.patch("/transaction-items/price")
+def update_item_price_endpoint(data: PriceUpdate):
+
+    item = update_item_price(
+        data.transaction_id,
+        data.item_id,
+        data.price_per_kg
+    )
+
+    if not item:
+        return {"error": "Transaction item not found"}
+
+    return {
+        "message": f"Price updated for {item['item_name']}",
+        "transaction_id": item["transaction_id"],
+        "item_id": item["item_id"],
+        "price_per_kg": item["price_per_kg"]
+    }
 
 
 @router.post("/transactions/{id}/confirm")
@@ -54,7 +71,18 @@ def confirm_transaction_endpoint(id: int):
 
     transaction = get_transaction(id)
 
+    if not transaction:
+        return {"error": "Transaction not found"}
+
     return {
         "status": "confirmed",
         "total_cost": transaction["total_cost"]
     }
+
+@router.get("/transactions_with_items/{id}/items")
+def get_transaction_items_endpoint(id: int):
+    return get_transaction_with_items(id)
+
+@router.delete("/transactions/{id}")
+def delete_transaction_endpoint(id: int):
+    return delete_transaction(id)

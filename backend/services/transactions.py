@@ -1,5 +1,7 @@
 import sqlite3
 
+TRANSACTION_TYPE_BUY = "buy"
+
 def get_transactions():
 
     with sqlite3.connect("parinya.db") as conn:
@@ -20,12 +22,12 @@ def create_transaction(transaction):
         cursor = conn.cursor()
 
         cursor.execute("""
-        INSERT INTO transactions (user_id, transaction_type, status)
-        VALUES (?, ?, 'draft')
+        INSERT INTO transactions (user_id, transaction_type, status, total_cost)
+        VALUES (?, ?, 'draft', 0 )
         """, (
-                transaction.user_id,
-                transaction.transaction_type
-            ))
+            transaction.user_id,
+            TRANSACTION_TYPE_BUY
+        ))
 
         return cursor.lastrowid
     
@@ -55,27 +57,88 @@ def delete_transaction(transaction_id):
 def add_transaction_item(transaction_id, item_id, weight):
 
     with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
+        # เช็ค transaction status
         cursor.execute("""
-        INSERT INTO transaction_items (transaction_id, item_id, weight)
-        VALUES (?, ?, ?)
-        """, (transaction_id, item_id, weight))
+        SELECT status
+        FROM transactions
+        WHERE transaction_id = ?
+        """, (transaction_id,))
 
-        return cursor.lastrowid
+        tx = cursor.fetchone()
+
+        if not tx:
+            return {"error": "Transaction not found"}
+
+        if tx["status"] != "draft":
+            return {"error": "Transaction already confirmed"}
+
+        # เช็คว่ามี item นี้อยู่แล้วไหม
+        cursor.execute("""
+        SELECT id, weight
+        FROM transaction_items
+        WHERE transaction_id = ? AND item_id = ?
+        """, (transaction_id, item_id))
+
+        existing = cursor.fetchone()
+
+        if existing:
+            # รวม weight
+            new_weight = existing["weight"] + weight
+
+            cursor.execute("""
+            UPDATE transaction_items
+            SET weight = ?
+            WHERE id = ?
+            """, (new_weight, existing["id"]))
+
+            return {
+                "message": "Weight merged",
+                "transaction_item_id": existing["id"],
+                "new_weight": new_weight
+            }
+
+        else:
+            # insert ใหม่
+            cursor.execute("""
+            INSERT INTO transaction_items
+            (transaction_id, item_id, weight)
+            VALUES (?, ?, ?)
+            """, (transaction_id, item_id, weight))
+
+            return {
+                "message": "Item added",
+                "transaction_item_id": cursor.lastrowid,
+                "weight": weight
+            }
     
-def update_item_price(transaction_item_id, new_price_per_kg):
+import sqlite3
+
+def update_item_price(transaction_id, item_id, new_price):
 
     with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         cursor.execute("""
         UPDATE transaction_items
         SET price_per_kg = ?
-        WHERE id = ?
-        """, (new_price_per_kg, transaction_item_id))
+        WHERE transaction_id = ? AND item_id = ?
+        """, (new_price, transaction_id, item_id))
 
-        return cursor.rowcount
+        if cursor.rowcount == 0:
+            return None
+
+        cursor.execute("""
+        SELECT ti.transaction_id, ti.item_id, ti.price_per_kg, i.item_name
+        FROM transaction_items ti
+        JOIN items i ON ti.item_id = i.item_id
+        WHERE ti.transaction_id = ? AND ti.item_id = ?
+        """, (transaction_id, item_id))
+
+        return dict(cursor.fetchone())
     
 def calculate_total_cost(transaction_id):
 
@@ -108,6 +171,7 @@ def confirm_transaction(transaction_id):
 def get_transaction(transaction_id):
 
     with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -115,7 +179,37 @@ def get_transaction(transaction_id):
         WHERE transaction_id = ?
         """, (transaction_id,))
 
-        return cursor.fetchone()
+        row = cursor.fetchone()
+
+        return dict(row) if row else None
+    
+def get_transaction_with_items(transaction_id):
+
+    with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT * FROM transactions
+        WHERE transaction_id = ?
+        """, (transaction_id,))
+
+        transaction = cursor.fetchone()
+
+        if not transaction:
+            return None
+
+        cursor.execute("""
+        SELECT * FROM transaction_items
+        WHERE transaction_id = ?
+        """, (transaction_id,))
+
+        items = cursor.fetchall()
+
+        return {
+            "transaction": dict(transaction),
+            "items": [dict(i) for i in items]
+        }
     
 def get_transaction_items(transaction_id):
 
