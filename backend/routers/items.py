@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from schemas.items import ItemCreate
-from services.items import create_item, get_items
+from schemas.items import ItemCreate, ItemDelete
+from services.items import create_item, get_items, delete_item
 
 router = APIRouter()
 
@@ -11,3 +11,14 @@ def read_items():
 @router.post("/items")
 def create_item_endpoint(item: ItemCreate):
     return create_item(item)
+
+@router.delete("/items/{id}")
+def delete_item_endpoint(id: int):
+
+    item = delete_item(id)
+
+    return {
+        "item_id": item["item_id"],
+        "item_name": item["item_name"],
+        "message": "Item deleted"
+    }

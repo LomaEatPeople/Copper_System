@@ -41,3 +41,29 @@ def update_item_price(item_id, new_price):
 
     conn.commit()
     conn.close()
+
+def delete_item(item_id):
+
+    with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # get item first
+        cursor.execute("""
+        SELECT item_id, item_name
+        FROM items
+        WHERE item_id = ?
+        """, (item_id,))
+
+        item = cursor.fetchone()
+
+        if not item:
+            return None
+
+        # delete item
+        cursor.execute("""
+        DELETE FROM items
+        WHERE item_id = ?
+        """, (item_id,))
+
+        return dict(item)
