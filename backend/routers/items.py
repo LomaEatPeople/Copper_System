@@ -13,9 +13,9 @@ def create_item_endpoint(item: ItemCreate):
     return create_item(item)
 
 @router.delete("/items/{id}")
-def delete_item_endpoint(id: int):
+def delete_item_endpoint(item: ItemDelete):
 
-    item = delete_item(id)
+    item = delete_item(item.item_id)
 
     return {
         "item_id": item["item_id"],

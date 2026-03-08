@@ -3,14 +3,17 @@ import sqlite3
 def get_transactions():
 
     with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM transactions")
+        cursor.execute("""
+        SELECT * FROM transactions
+        """)
 
         rows = cursor.fetchall()
 
-        return rows
-
+        return [dict(row) for row in rows]
+    
 def create_transaction(transaction):
 
     with sqlite3.connect("parinya.db") as conn:
@@ -49,21 +52,15 @@ def delete_transaction(transaction_id):
         WHERE transaction_id = ?
         """, (transaction_id,))
 
-def add_transaction_item(transaction_id, item_id, weight, price_per_kg):
+def add_transaction_item(transaction_id, item_id, weight):
 
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
-        INSERT INTO transaction_items
-        (transaction_id, item_id, weight, price_per_kg)
-        VALUES (?, ?, ?, ?)
-        """, (
-            transaction_id,
-            item_id,
-            weight,
-            price_per_kg
-        ))
+        INSERT INTO transaction_items (transaction_id, item_id, weight)
+        VALUES (?, ?, ?)
+        """, (transaction_id, item_id, weight))
 
         return cursor.lastrowid
     

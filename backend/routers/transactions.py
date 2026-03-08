@@ -38,8 +38,7 @@ def add_transaction_item_endpoint(id: int, item: TransactionItemCreate):
     return add_transaction_item(
         id,
         item.item_id,
-        item.weight,
-        item.price_per_kg
+        item.weight
     )
   
 
