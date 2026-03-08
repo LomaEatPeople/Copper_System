@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from services.items import get_items, create_item
 from schemas.items import ItemCreate
+from services.items import create_item, get_items
 
 router = APIRouter()
 
@@ -9,5 +9,5 @@ def read_items():
     return get_items()
 
 @router.post("/items")
-def create_new_item(item: ItemCreate):
+def create_item_endpoint(item: ItemCreate):
     return create_item(item)
