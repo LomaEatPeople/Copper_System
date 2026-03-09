@@ -7,7 +7,8 @@ from services.transactions import (
     confirm_transaction,
     get_transaction,
     get_transaction_with_items,
-    delete_transaction
+    delete_transaction,
+    remove_transaction_item
 )
 
 from schemas.transactions import TransactionCreate, TransactionItemCreate, PriceUpdate
@@ -86,3 +87,7 @@ def get_transaction_items_endpoint(id: int):
 @router.delete("/transactions/{id}")
 def delete_transaction_endpoint(id: int):
     return delete_transaction(id)
+
+@router.delete("/transaction-items")
+def remove_transaction_item_endpoint(transaction_id: int, item_id: int):
+    return remove_transaction_item(transaction_id, item_id)

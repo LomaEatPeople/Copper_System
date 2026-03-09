@@ -62,11 +62,13 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         transaction_id INTEGER,
         item_id INTEGER,
+        item_name TEXT,
         weight REAL NOT NULL,
         price_per_kg REAL NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
-        FOREIGN KEY (item_id) REFERENCES items(item_id)
+        FOREIGN KEY (item_id) REFERENCES items(item_id),
+        FOREIGN KEY (item_name) REFERENCES items(item_name)
     )
     """)
 

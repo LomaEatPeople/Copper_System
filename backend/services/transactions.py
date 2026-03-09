@@ -2,6 +2,30 @@ import sqlite3
 
 TRANSACTION_TYPE_BUY = "buy"
 
+def status_checker(transaction_id):
+
+    with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT status
+        FROM transactions
+        WHERE transaction_id = ?
+        """, (transaction_id,))
+
+        tx = cursor.fetchone()
+
+        if not tx:
+            return {"error": "Transaction not found"}
+
+        return tx["status"]
+    
+def ensure_draft(transaction_id):
+    status = status_checker(transaction_id)
+    if status != "draft":
+        raise Exception("Transaction already confirmed")
+
 def get_transactions():
 
     with sqlite3.connect("parinya.db") as conn:
@@ -44,8 +68,15 @@ def update_transaction_status(transaction_id, new_status):
 
         return cursor.rowcount
 
-def delete_transaction(transaction_id):
-    
+def delete_transaction(transaction_id, confirm=False):
+
+    status = status_checker(transaction_id)
+
+    if status == "confirmed" and not confirm:
+        return {
+            "warning": "Transaction is confirmed. Send confirm=true to delete"
+        }
+
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
 
@@ -54,26 +85,15 @@ def delete_transaction(transaction_id):
         WHERE transaction_id = ?
         """, (transaction_id,))
 
+        return {"message": "Transaction deleted"}
+
 def add_transaction_item(transaction_id, item_id, weight):
+
+    ensure_draft(transaction_id)
 
     with sqlite3.connect("parinya.db") as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-
-        # เช็ค transaction status
-        cursor.execute("""
-        SELECT status
-        FROM transactions
-        WHERE transaction_id = ?
-        """, (transaction_id,))
-
-        tx = cursor.fetchone()
-
-        if not tx:
-            return {"error": "Transaction not found"}
-
-        if tx["status"] != "draft":
-            return {"error": "Transaction already confirmed"}
 
         # เช็คว่ามี item นี้อยู่แล้วไหม
         cursor.execute("""
@@ -113,10 +133,10 @@ def add_transaction_item(transaction_id, item_id, weight):
                 "transaction_item_id": cursor.lastrowid,
                 "weight": weight
             }
-    
-import sqlite3
 
 def update_item_price(transaction_id, item_id, new_price):
+
+    ensure_draft(transaction_id)
 
     with sqlite3.connect("parinya.db") as conn:
         conn.row_factory = sqlite3.Row
@@ -237,3 +257,33 @@ def calculate_transaction_total(transaction_id):
         total = cursor.fetchone()[0]
 
         return total if total else 0    
+def remove_transaction_item(transaction_id, item_id):
+
+    ensure_draft(transaction_id)
+
+    with sqlite3.connect("parinya.db") as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # ดึงชื่อ item
+        cursor.execute("""
+        SELECT item_name FROM items WHERE item_id = ?
+        """, (item_id,))
+        
+        item = cursor.fetchone()
+
+        if not item:
+            return {"error": "Item not found"}
+
+        item_name = item["item_name"]
+
+        # ลบ item จาก transaction
+        cursor.execute("""
+        DELETE FROM transaction_items
+        WHERE transaction_id = ? AND item_id = ?
+        """, (transaction_id, item_id))
+
+        if cursor.rowcount == 0:
+            return {"error": "Transaction item not found"}
+
+        return {"message": f"Item {item_name} removed from transaction"}
