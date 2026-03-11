@@ -1,8 +1,20 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers import items, transactions
 
 app = FastAPI()
 
-app.include_router(items.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+app.include_router(items.router)
 app.include_router(transactions.router)
+
+@app.get("/transactions")
+def get_transactions():
+    return []

@@ -1,0 +1,23 @@
+/* stylelint-disable at-rule-no-unknown */
+@import "tailwindcss";
+/* stylelint-enable at-rule-no-unknown */
+
+:root {
+  --color-primary: #16a34a;
+  --color-bg: #f8fafc;
+  --color-border: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #22c55e;
+    --color-bg: #121212;
+    --color-border: #3f3f3f;
+  }
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  font-family: Arial, Helvetica, sans-serif;
+}
