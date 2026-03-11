@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File
+
 from services.transactions import (
     get_transactions,
     create_transaction,
@@ -8,7 +9,9 @@ from services.transactions import (
     get_transaction,
     get_transaction_with_items,
     delete_transaction,
-    remove_transaction_item
+    remove_transaction_item,
+    get_transaction_images,
+    upload_transaction_image
 )
 
 from schemas.transactions import TransactionCreate, TransactionItemCreate, PriceUpdate
@@ -80,7 +83,7 @@ def confirm_transaction_endpoint(id: int):
         "total_cost": transaction["total_cost"]
     }
 
-@router.get("/transactions_with_items/{id}/items")
+@router.get("/transactions/{id}/items")
 def get_transaction_items_endpoint(id: int):
     return get_transaction_with_items(id)
 
@@ -91,3 +94,12 @@ def delete_transaction_endpoint(id: int):
 @router.delete("/transaction-items")
 def remove_transaction_item_endpoint(transaction_id: int, item_id: int):
     return remove_transaction_item(transaction_id, item_id)
+
+@router.post("/transactions/{id}/images")
+def upload_transaction_image_endpoint(id: int, file: UploadFile = File(...)):
+    return upload_transaction_image(id, file)
+
+
+@router.get("/transactions/{id}/images")
+def get_transaction_images_endpoint(id: int):
+    return get_transaction_images(id)

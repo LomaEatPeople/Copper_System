@@ -72,6 +72,19 @@ def init_db():
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE transaction_images (
+    image_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INT NOT NULL,
+    image_url TEXT NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (transaction_id)
+    REFERENCES transactions(transaction_id)
+    ON DELETE CASCADE
+    )
+    """)
+
     conn.commit()
     conn.close()
 

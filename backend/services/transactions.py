@@ -1,6 +1,9 @@
 import sqlite3
+import os
+from fastapi import UploadFile, File
 
 TRANSACTION_TYPE_BUY = "buy"
+UPLOAD_DIR = "uploads"
 
 def status_checker(transaction_id):
 
@@ -287,3 +290,49 @@ def remove_transaction_item(transaction_id, item_id):
             return {"error": "Transaction item not found"}
 
         return {"message": f"Item {item_name} removed from transaction"}
+    
+def upload_transaction_image(id: int, file: UploadFile = File(...)):
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+    path = f"{UPLOAD_DIR}/transaction_{id}_{file.filename}"
+
+    with open(path, "wb") as f:
+        f.write(file.file.read())
+
+    with sqlite3.connect("parinya.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        INSERT INTO transaction_images (transaction_id, image_url)
+        VALUES (?, ?)
+        """, (id, path))
+
+        conn.commit()
+
+    return {
+        "message": "Image uploaded",
+        "image_url": path
+    }
+    
+def get_transaction_images(transaction_id):
+
+    with sqlite3.connect("parinya.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        SELECT image_id, image_url
+        FROM transaction_images
+        WHERE transaction_id = ?
+        """, (transaction_id,))
+
+        rows = cursor.fetchall()
+
+        images = []
+        for row in rows:
+            images.append({
+                "image_id": row[0],
+                "image_url": row[1]
+            })
+
+        return images
