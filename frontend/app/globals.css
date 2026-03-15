@@ -18,6 +18,7 @@
 
 body {
   background: var(--color-bg);
-  color: var(--color-primary);
+  /* color: var(--color-primary);  <-- ลบบรรทัดนี้ทิ้ง หรือเปลี่ยนใหม่ */
+  color: #1f2937; /* ใช้สีเทาเข้ม (gray-800) แทน */
   font-family: Arial, Helvetica, sans-serif;
 }
