@@ -91,51 +91,34 @@ def delete_transaction(transaction_id, confirm=False):
         return {"message": "Transaction deleted"}
 
 def add_transaction_item(transaction_id, item_id, weight):
-
     ensure_draft(transaction_id)
-
     with sqlite3.connect("parinya.db") as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        # เช็คว่ามี item นี้อยู่แล้วไหม
-        cursor.execute("""
-        SELECT id, weight
-        FROM transaction_items
-        WHERE transaction_id = ? AND item_id = ?
-        """, (transaction_id, item_id))
+        # 1. ไปดึงชื่อสินค้าจากตาราง items มาก่อน (เพราะในตาราง ti ต้องการ item_name)
+        cursor.execute("SELECT item_name FROM items WHERE item_id = ?", (item_id,))
+        item_row = cursor.fetchone()
+        name_from_db = item_row["item_name"] if item_row else "Unknown"
 
+        # 2. เช็คว่ามีสินค้าตัวนี้ในบิลหรือยัง
+        cursor.execute("""
+            SELECT id, weight FROM transaction_items 
+            WHERE transaction_id = ? AND item_id = ?
+        """, (transaction_id, item_id))
         existing = cursor.fetchone()
 
         if existing:
-            # รวม weight
             new_weight = existing["weight"] + weight
-
-            cursor.execute("""
-            UPDATE transaction_items
-            SET weight = ?
-            WHERE id = ?
-            """, (new_weight, existing["id"]))
-
-            return {
-                "message": "Weight merged",
-                "transaction_item_id": existing["id"],
-                "new_weight": new_weight
-            }
-
+            cursor.execute("UPDATE transaction_items SET weight = ? WHERE id = ?", (new_weight, existing["id"]))
+            return {"message": "Weight merged", "new_weight": new_weight}
         else:
-            # insert ใหม่
+            # 3. ใส่ item_name เข้าไปด้วยตอน Insert (ตามที่ Schema ตารางต้องการ)
             cursor.execute("""
-            INSERT INTO transaction_items
-            (transaction_id, item_id, weight)
-            VALUES (?, ?, ?)
-            """, (transaction_id, item_id, weight))
-
-            return {
-                "message": "Item added",
-                "transaction_item_id": cursor.lastrowid,
-                "weight": weight
-            }
+                INSERT INTO transaction_items (transaction_id, item_id, item_name, weight)
+                VALUES (?, ?, ?, ?)
+            """, (transaction_id, item_id, name_from_db, weight))
+            return {"message": "Item added", "weight": weight}
 
 def update_item_price(transaction_id, item_id, new_price):
 
@@ -164,32 +147,60 @@ def update_item_price(transaction_id, item_id, new_price):
         return dict(cursor.fetchone())
     
 def calculate_total_cost(transaction_id):
-
+    """ฟังก์ชันกลางสำหรับคำนวณยอดรวมจากรายการสินค้า"""
+    with sqlite3.connect("parinya.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT SUM(weight * price_per_kg)
+            FROM transaction_items
+            WHERE transaction_id = ?
+        """, (transaction_id,))
+        
+        total = cursor.fetchone()[0]
+        return total if total else 0
+    
+def update_item_price_and_sync_total(transaction_id, item_id, new_price):
+    """อัปเดตราคาและนำยอดรวมไปบันทึกลงตาราง transactions ทันที"""
+    ensure_draft(transaction_id) # เพิ่มความปลอดภัยเช็ค status ก่อน
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
 
+        # 1. อัปเดตราคาต่อหน่วย
         cursor.execute("""
-        SELECT SUM(weight * price_per_kg)
-        FROM transaction_items
-        WHERE transaction_id = ?
-        """, (transaction_id,))
+            UPDATE transaction_items
+            SET price_per_kg = ?
+            WHERE transaction_id = ? AND item_id = ?
+        """, (new_price, transaction_id, item_id))
 
-        total = cursor.fetchone()[0]
+        # 2. คำนวณยอดรวมใหม่ (เรียกใช้ฟังก์ชันกลาง)
+        new_total = calculate_total_cost(transaction_id)
 
-        return total if total else 0
+        # 3. ซิงค์ยอดรวมไปที่ตารางหลัก (transactions)
+        cursor.execute("""
+            UPDATE transactions
+            SET total_cost = ?
+            WHERE transaction_id = ?
+        """, (new_total, transaction_id))
+
+        conn.commit()
+        return {"status": "success", "new_total": new_total}
     
 def confirm_transaction(transaction_id):
-
+    """ยืนยันบิลและบันทึกยอดรวมสุดท้าย"""
     total = calculate_total_cost(transaction_id)
 
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
-
         cursor.execute("""
-        UPDATE transactions
-        SET total_cost = ?, status = 'confirmed'
-        WHERE transaction_id = ?
+            UPDATE transactions
+            SET total_cost = ?, status = 'confirmed'
+            WHERE transaction_id = ?
         """, (total, transaction_id))
+        conn.commit()
+        return {"message": "Transaction confirmed", "total_cost": total}
+    
+def calculate_transaction_total(transaction_id):
+    return calculate_total_cost(transaction_id)
 
 def get_transaction(transaction_id):
 
@@ -207,28 +218,27 @@ def get_transaction(transaction_id):
         return dict(row) if row else None
     
 def get_transaction_with_items(transaction_id):
-
     with sqlite3.connect("parinya.db") as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""
-        SELECT * FROM transactions
-        WHERE transaction_id = ?
-        """, (transaction_id,))
-
+        # ดึง Transaction
+        cursor.execute("SELECT * FROM transactions WHERE transaction_id = ?", (transaction_id,))
         transaction = cursor.fetchone()
+        if not transaction: return None
 
-        if not transaction:
-            return None
-
+        # แก้ตรงนี้: JOIN กับตาราง items เพื่อเอา item_name มาแสดงผล
         cursor.execute("""
-        SELECT * FROM transaction_items
-        WHERE transaction_id = ?
+            SELECT 
+                ti.*, 
+                i.item_name 
+            FROM transaction_items ti
+            LEFT JOIN items i ON ti.item_id = i.item_id
+            WHERE ti.transaction_id = ?
         """, (transaction_id,))
 
         items = cursor.fetchall()
-
+        
         return {
             "transaction": dict(transaction),
             "items": [dict(i) for i in items]
