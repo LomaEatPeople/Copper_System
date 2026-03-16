@@ -68,7 +68,7 @@ def update_item_price_endpoint(data: PriceUpdate):
     }
 
 
-@router.post("/transactions/{id}/confirm")
+@router.patch("/transactions/{id}/confirm")
 def confirm_transaction_endpoint(id: int):
 
     confirm_transaction(id)
@@ -80,7 +80,8 @@ def confirm_transaction_endpoint(id: int):
 
     return {
         "status": "confirmed",
-        "total_cost": transaction["total_cost"]
+        "total_cost": transaction["total_cost"],
+        "message": f"Transaction {id} confirmed with total cost {transaction['total_cost']}"
     }
 
 @router.get("/transactions/{id}/items")

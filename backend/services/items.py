@@ -4,13 +4,15 @@ def get_items():
 
     conn = sqlite3.connect("parinya.db")
     cursor = conn.cursor()
+    query = """
+    SELECT i.item_id, i.item_name, c.name 
+    FROM items i
+    LEFT JOIN categories c ON i.category_id = c.category_id
+    """
 
-    cursor.execute("SELECT * FROM items")
-
+    cursor.execute(query)
     rows = cursor.fetchall()
-
     conn.close()
-
     return rows
 
 def create_item(item):

@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from fastapi import UploadFile, File
+from datetime import datetime, timedelta
 
 TRANSACTION_TYPE_BUY = "buy"
 UPLOAD_DIR = "uploads"
@@ -36,7 +37,8 @@ def get_transactions():
         cursor = conn.cursor()
 
         cursor.execute("""
-        SELECT * FROM transactions
+            SELECT * FROM transactions 
+            ORDER BY transaction_date DESC
         """)
 
         rows = cursor.fetchall()
@@ -44,16 +46,18 @@ def get_transactions():
         return [dict(row) for row in rows]
     
 def create_transaction(transaction):
+    th_time = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S")
 
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
 
         cursor.execute("""
-        INSERT INTO transactions (user_id, transaction_type, status, total_cost)
-        VALUES (?, ?, 'draft', 0 )
+        INSERT INTO transactions (user_id, transaction_type, status, total_cost, transaction_date)
+        VALUES (?, ?, 'draft', 0, ?)
         """, (
             transaction.user_id,
-            TRANSACTION_TYPE_BUY
+            TRANSACTION_TYPE_BUY,
+            th_time  # <--- ส่งเวลาไทยที่เราสร้างไว้เข้าไป
         ))
 
         return cursor.lastrowid
