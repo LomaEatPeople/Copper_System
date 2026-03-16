@@ -1,12 +1,24 @@
-import apiClient from "../api/apiClient";
+// ใส่ปีกกาครอบ apiClient เพื่อให้ตรงกับการ export { apiClient }
+import { apiClient } from "../api/apiClient";
 
 const transactionService = {
-  // ฟังก์ชันดึงรายการทั้งหมดที่หน้าแรกเรียกใช้
   getTransactions: () => {
-    return apiClient.get("/transactions");
+    // ตอนนี้ apiClient จะมีฟังก์ชัน .get แน่นอน
+    return apiClient.get(`/transactions?t=${new Date().getTime()}`);
   },
 
-  // ฟังก์ชันสร้างบิลใหม่
+  deleteTransaction: (id: number) => {
+    console.log("Service: Attempting to delete ID:", id);
+    return apiClient.delete(`/transactions/${id}`, {
+      data: { 
+        transaction_id: id 
+      },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  },
+
   createTransaction: (data: any) => {
     return apiClient.post("/transactions", data);
   }

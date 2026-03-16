@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { billService } from "@/services/billService";
-import { getItems } from "@/services/itemService";
+import { itemService } from "@/services/itemService";
 
-export default function BillManagementPage() {
+export default async function BillManagementPage() {
   const { id } = useParams();
   const router = useRouter();
   const transactionId = Number(id);
@@ -17,6 +17,12 @@ export default function BillManagementPage() {
   const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [billRes, billItemsRes, storeItemsRes] = await Promise.all([
+  billService.getTransactionById(transactionId),
+  billService.getTransactionItems(transactionId),
+  itemService.getAllItems() // ใช้ตัวนี้แทน
+  ]);
+
   const fetchData = useCallback(async () => {
     if (!transactionId) return;
     try {
@@ -24,7 +30,7 @@ export default function BillManagementPage() {
       const [billRes, billItemsRes, storeItemsRes] = await Promise.all([
         billService.getTransactionById(transactionId),
         billService.getTransactionItems(transactionId),
-        getItems()
+        itemService.getAllItems()
       ]);
       
       setBill(billRes.data);

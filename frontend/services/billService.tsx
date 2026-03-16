@@ -1,6 +1,6 @@
 // services/billService.ts
 import { get } from "http";
-import apiClient from "../api/apiClient";
+import {apiClient} from "../api/apiClient";
 
 export const billService = {
   // ดึงรายการบิลทั้งหมด (ที่คุณ GET ได้ข้อมูลมา)
