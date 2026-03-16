@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { billService } from "@/services/billService";
 import { itemService } from "@/services/itemService";
 
-export default async function BillManagementPage() {
+export default function BillManagementPage() {
   const { id } = useParams();
   const router = useRouter();
   const transactionId = Number(id);
@@ -16,12 +16,12 @@ export default async function BillManagementPage() {
   const [selectedItemId, setSelectedItemId] = useState("");
   const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ msg: string; type: "error" | "success" } | null>(null);
 
-  const [billRes, billItemsRes, storeItemsRes] = await Promise.all([
-  billService.getTransactionById(transactionId),
-  billService.getTransactionItems(transactionId),
-  itemService.getAllItems() // ใช้ตัวนี้แทน
-  ]);
+  const showToast = (msg: string, type: "success" | "error") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 10000);
+  };
 
   const fetchData = useCallback(async () => {
     if (!transactionId) return;
@@ -79,22 +79,23 @@ export default async function BillManagementPage() {
   }
   };
   const handleConfirm = async () => {
-    if (!confirm("ยืนยันการชำระเงินและปิดบิลนี้?")) return;
     try {
       await billService.confirmTransaction(transactionId);
-      fetchData();
+      showToast("ยืนยันบิลสำเร็จ!", "success");
+      fetchData(); 
     } catch (error) {
-      alert("ยืนยันบิลไม่สำเร็จ");
+      console.error("Confirm failed:", error);
+      alert("ไม่สามารถยืนยันบิลได้");
     }
   };
 
   const handleDeleteItem = async (itemId: number) => {
-    if (!confirm("ลบรายการนี้?")) return;
     try {
       await billService.deleteTransactionItem(transactionId, itemId);
+      showToast("ลบเรียบร้อยแล้วจ้าาา", "success");
       fetchData();
-    } catch (error) {
-      alert("ลบไม่สำเร็จ");
+    } catch (err: any) {
+      showToast("Backend บอกว่าลบไม่ได้จ้า!", "error");
     }
   };
 
@@ -236,6 +237,13 @@ export default async function BillManagementPage() {
           </div>
         </div>
       </div>
+      {toast && (
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[999] px-8 py-4 rounded-2xl shadow-2xl font-black text-white animate-bounce ${
+          toast.type === "error" ? "bg-red-500" : "bg-green-600"
+        }`}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }

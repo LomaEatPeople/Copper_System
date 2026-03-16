@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import transactionService from "@/services/transactionService";
 import { useRouter } from "next/navigation";
+import DisplayNumber from "@/components/DisplayNumber";
 
 type Transaction = {
   transaction_id: number;
@@ -18,17 +19,18 @@ export default function TransactionsPage() {
   const [monthFilter, setMonthFilter] = useState("all");
   const [dayFilter, setDayFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false); // กันระเบิดตอน Hydration
   const router = useRouter();
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" } | null>(null);
 
-  // ฟังก์ชันสำหรับแสดง Toast Message แบบง่ายๆ
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000); // 3 วินาทีหายไปเองจ้า
+    setTimeout(() => setToast(null), 3000);
   };
 
   const parseDate = (dateStr: string) => {
     try {
+      if (!dateStr) return new Date();
       const date = new Date(dateStr.replace(" ", "T"));
       return isNaN(date.getTime()) ? new Date() : date;
     } catch {
@@ -39,15 +41,9 @@ export default function TransactionsPage() {
   const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true);
-      // ยิง Get Transactions
       const response = await transactionService.getTransactions();
-      
-      console.log("Fetch success at:", new Date().toLocaleTimeString());
-      
       const data = response.data || response;
       setTransactions(Array.isArray(data) ? data : []);
-      
-      // บังคับให้ Next.js รับรู้การเปลี่ยนแปลงของ Route
       router.refresh(); 
     } catch (error) {
       console.error("Fetch error:", error);
@@ -56,50 +52,45 @@ export default function TransactionsPage() {
     }
   }, [router]);
 
-  // รวมทุก Event ไว้ใน useEffect เดียวกัน
   useEffect(() => {
+    setMounted(true); // ยืนยันว่าหน้าจอพร้อมโหลด Date แล้ว
     fetchTransactions();
 
     const handleRefresh = () => {
-      if (document.visibilityState === 'visible') {
-        fetchTransactions();
-      }
+      if (document.visibilityState === 'visible') fetchTransactions();
     };
 
-    // ดักจับทั้งการสลับ Tab และการ Focus หน้าจอ (กดย้อนกลับมา)
     window.addEventListener("focus", handleRefresh);
     document.addEventListener("visibilitychange", handleRefresh);
-
     return () => {
       window.removeEventListener("focus", handleRefresh);
       document.removeEventListener("visibilitychange", handleRefresh);
     };
   }, [fetchTransactions]);
 
-  const filteredTransactions = useMemo(() => {
-    return transactions
-      .filter((t) => {
-        const date = parseDate(t.transaction_date);
-        const monthMatch = monthFilter === "all" || (date.getMonth() + 1) === Number(monthFilter);
-        const dayMatch = dayFilter === "all" || date.getDate() === Number(dayFilter);
-        const searchMatch = search === "" || t.transaction_id.toString().includes(search);
-        return monthMatch && dayMatch && searchMatch;
-      })
-      .sort((a, b) => b.transaction_id - a.transaction_id);
+  // จัดเรียงใน filteredTransactions ตามที่คุณน้องต้องการ
+const filteredTransactions = useMemo(() => {
+    return transactions.filter((t) => {
+      const date = parseDate(t.transaction_date);
+      const monthMatch = monthFilter === "all" || (date.getMonth() + 1) === Number(monthFilter);
+      const dayMatch = dayFilter === "all" || date.getDate() === Number(dayFilter);
+      const searchMatch = search === "" || t.transaction_id.toString().includes(search);
+      
+      return monthMatch && dayMatch && searchMatch;
+    });
+    // ตรงนี้ปล่อยให้มันเรียงตาม Backend (SQL DESC) มาเลยค่ะ
   }, [transactions, monthFilter, dayFilter, search]);
 
   const handleNewBill = async () => {
     try {
       const response = await transactionService.createTransaction({ user_id: 0 });
       const newId = response.data?.transaction_id || response.data;
-      if (newId) {
-        router.push(`/transactions/${newId}`);
-      }
+      if (newId) router.push(`/transactions/${newId}`);
     } catch (error) {
-      console.error("Create Bill Error:", error);
       alert("ไม่สามารถสร้างบิลใหม่ได้");
     }
   };
+
   const handleDelete = async (id: number, status: string) => {
     const s = status?.toLowerCase();
     if (s === "complete" || s === "confirmed") {
@@ -107,7 +98,7 @@ export default function TransactionsPage() {
       return;
     }
     try {
-      const res = await transactionService.deleteTransaction(id);
+      await transactionService.deleteTransaction(id);
       showToast("ลบเรียบร้อยแล้วจ้าาา", "success");
       await fetchTransactions();
     } catch (err: any) {
@@ -135,6 +126,7 @@ export default function TransactionsPage() {
           </button>
         </div>
 
+        {/* Filter Section */}
         <div className="flex flex-wrap gap-3 mb-8 items-center">
           <select 
             className="border-none rounded-xl px-4 py-3 bg-white shadow-sm font-bold outline-none focus:ring-2 focus:ring-green-500"
@@ -183,16 +175,20 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {loading ? (
+                {loading || !mounted ? (
                   <tr><td colSpan={6} className="text-center p-24 text-gray-400 font-black animate-pulse">LOADING DATA...</td></tr>
                 ) : filteredTransactions.length === 0 ? (
                   <tr><td colSpan={6} className="text-center p-24 text-gray-300 font-bold italic">NO TRANSACTIONS FOUND</td></tr>
                 ) : (
-                  filteredTransactions.map((t) => {
+                  filteredTransactions.map((t, index) => {
                     const dateObj = parseDate(t.transaction_date);
+                    const reverseIndex = (filteredTransactions.length - 1) - index;
                     return (
                       <tr key={t.transaction_id} className="hover:bg-blue-50/40 transition-colors group">
-                        <td className="p-6 font-black text-blue-600 text-lg">{t.transaction_id}</td>
+                        <td className="p-6 font-black text-blue-600 text-lg">
+                          {/* ใช้ DisplayNumber รัน 01, 02 ให้สวยๆ */}
+                          <DisplayNumber index={reverseIndex} />
+                        </td>
                         <td className="p-6">
                           <div className="text-xl font-black text-gray-900 leading-none mb-1">
                             {dateObj.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' })} น.
@@ -211,37 +207,29 @@ export default function TransactionsPage() {
                             {t.status}
                           </span>
                         </td>
-                          <td className="p-6 font-black text-gray-900 text-2xl tracking-tighter">
-                            ฿{(t.total_cost || 0).toLocaleString()}
-                          </td>
-                          <td className="p-6">
-                            <div className="flex items-center justify-center gap-4 pt-10 pl-12">
-                              
-                              {/* ปุ่ม OPEN */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation(); // กันไม่ให้ Event หลุดไปแถวอื่น
-                                  router.push(`/transactions/${t.transaction_id}`);
-                                }}
-                                className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black hover:bg-blue-600 shadow-md transition-all active:scale-95 whitespace-nowrap"
-                              >
-                                OPEN
-                              </button>
-                              <button
-                                onClick={() => {
-                                  console.log("ปุ่มถูกกดแล้วนะจ๊ะ!"); // ใส่เช็ค Log ตรงนี้ดู
-                                  handleDelete(t.transaction_id, t.status); // ส่ง status ไปเช็คข้างในฟังก์ชันด้วยจะเลิศมาก
-                                }}
-                                className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white active:scale-95 shadow-sm border border-red-100"
-                              >
-                                <img 
-                                  src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" 
-                                  alt="delete" 
-                                  className="w-8 h-8 object-contain"
-                                />
-                              </button>
-                            </div>
-                          </td>
+                        <td className="p-6 font-black text-gray-900 text-2xl tracking-tighter">
+                          ฿{(t.total_cost || 0).toLocaleString()}
+                        </td>
+                        <td className="p-6">
+                          <div className="flex items-center justify-center gap-4">
+                            <button
+                              onClick={() => router.push(`/transactions/${t.transaction_id}`)}
+                              className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black hover:bg-blue-600 shadow-md transition-all active:scale-95 whitespace-nowrap"
+                            >
+                              OPEN
+                            </button>
+                            <button
+                              onClick={() => handleDelete(t.transaction_id, t.status)}
+                              className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white active:scale-95 shadow-sm border border-red-100"
+                            >
+                              <img 
+                                src="https://cdn-icons-png.flaticon.com/512/6861/6861362.png" 
+                                alt="delete" 
+                                className="w-8 h-8 object-contain"
+                              />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })

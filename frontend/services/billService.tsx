@@ -1,5 +1,4 @@
 // services/billService.ts
-import { get } from "http";
 import {apiClient} from "../api/apiClient";
 
 export const billService = {
@@ -11,7 +10,13 @@ export const billService = {
 
   getTransactionWithItems: (id: number) => apiClient.get(`/transactions/${id}/with-items`),
 
-  deleteTransactionItem: (id: number, item_id: number) => apiClient.delete(`/transactions/${id}/items/${item_id}`),
+  deleteTransactionItem: (transactionId: number, itemId: number) => 
+    apiClient.delete("/transaction-items", {
+      params: {
+        transaction_id: transactionId,
+        item_id: itemId
+      }
+    }),
 
   // ดึงสินค้าที่อยู่ในบิลนั้นๆ
   // **ลองเช็คว่า Backend ใช้ URL ไหนระหว่าง 2 อันนี้**
@@ -37,6 +42,8 @@ export const billService = {
 },
 
   // ยืนยันบิล
-  confirmTransaction: (id: number) => 
-    apiClient.post(`/transactions/${id}/confirm`, { transaction_id: Number(id) }),
+confirmTransaction: (id: number) => {
+  // ต้องเป็น .patch และต้องมี /confirm ต่อท้ายแบบนี้เท่านั้นค่ะ!
+  return apiClient.patch(`/transactions/${id}/confirm`, {});
+},
 };
