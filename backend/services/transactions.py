@@ -1,4 +1,5 @@
 import sqlite3
+import shutil
 import os
 from fastapi import UploadFile, File
 from datetime import datetime, timedelta
@@ -306,27 +307,27 @@ def remove_transaction_item(transaction_id, item_id):
         return {"message": f"Item {item_name} removed from transaction"}
     
 def upload_transaction_image(id: int, file: UploadFile = File(...)):
-
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    path = f"{UPLOAD_DIR}/transaction_{id}_{file.filename}"
+    safe_filename = f"trans_{id}_{file.filename.replace(' ', '_')}"
+    path = f"{UPLOAD_DIR}/{safe_filename}"
 
-    with open(path, "wb") as f:
-        f.write(file.file.read())
+    image_url = f"/{path}"
+
+    with open(path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
     with sqlite3.connect("parinya.db") as conn:
         cursor = conn.cursor()
-
         cursor.execute("""
         INSERT INTO transaction_images (transaction_id, image_url)
         VALUES (?, ?)
-        """, (id, path))
-
+        """, (id, image_url)) # เก็บ URL แทน Path ในเครื่อง
         conn.commit()
 
     return {
-        "message": "Image uploaded",
-        "image_url": path
+        "message": "Image uploaded successfully",
+        "image_url": image_url
     }
     
 def get_transaction_images(transaction_id):
@@ -350,3 +351,36 @@ def get_transaction_images(transaction_id):
             })
 
         return images
+
+def check_image_requirement(transaction_id: int):
+    with sqlite3.connect("parinya.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM transaction_items ti
+            JOIN items i ON ti.item_id = i.item_id
+            JOIN categories c ON i.category_id = c.category_id
+            WHERE ti.transaction_id = ? AND c.require_image = 1
+        """, (transaction_id,))
+        
+        needs_image = cursor.fetchone()[0] > 0
+
+        if needs_image:
+            cursor.execute("SELECT COUNT(*) FROM transaction_images WHERE transaction_id = ?", (transaction_id,))
+            has_image = cursor.fetchone()[0] > 0
+            return needs_image and not has_image # คืนค่า True ถ้า "ต้องการแต่ยังไม่มี" (คือต้องล็อค!)
+            
+        return False # ไม่ต้องล็อค
+    
+def delete_transaction_image(transaction_id: int, image_id: int): 
+    with sqlite3.connect("parinya.db") as conn:
+        cursor = conn.cursor()
+    
+    # ลบโดยเช็คทั้ง ID บิล และ ID รูป เพื่อความปลอดภัย
+        cursor.execute(
+            "DELETE FROM transaction_images WHERE image_id = ? AND transaction_id = ?", 
+            (image_id, transaction_id)
+        )
+        conn.commit()
+    return {"status": "success"}

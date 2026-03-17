@@ -8,12 +8,12 @@ DB_PATH = "parinya.db"
 def get_categories():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT category_id, name FROM categories")
+    # 🟢 เพิ่ม require_image เข้าไปใน SELECT ด้วย
+    cursor.execute("SELECT category_id, name, require_image FROM categories")
     rows = cursor.fetchall()
     conn.close()
-    
-    # แปลงจาก tuple เป็น list of dict
-    return [{"category_id": r[0], "name": r[1]} for r in rows]
+
+    return [{"category_id": r[0], "name": r[1], "require_image": r[2]} for r in rows]
 
 def create_category(category: CategoryCreate):
     conn = sqlite3.connect(DB_PATH)
@@ -23,6 +23,24 @@ def create_category(category: CategoryCreate):
         new_id = cursor.lastrowid
         conn.commit()
         return {"category_id": new_id, "name": category.name}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+def update_category(category_id: int, category: CategoryCreate):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        if category.name:
+            cursor.execute("UPDATE categories SET name = ?, require_image = ? WHERE category_id = ?", 
+                           (category.name, category.require_image, category_id))
+        else:
+            cursor.execute("UPDATE categories SET require_image = ? WHERE category_id = ?", 
+                           (category.require_image, category_id))
+        
+        conn.commit()
+        return {"status": "success"}
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))

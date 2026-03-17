@@ -8,7 +8,8 @@ def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS categories (
         category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
+        name TEXT NOT NULL,
+        require_image INTEGER DEFAULT 0
     )
     """)
 
@@ -73,7 +74,7 @@ def init_db():
     """)
 
     cursor.execute("""
-    CREATE TABLE transaction_images (
+    CREATE TABLE IF NOT EXISTS transaction_images (
     image_id INTEGER PRIMARY KEY AUTOINCREMENT,
     transaction_id INT NOT NULL,
     image_url TEXT NOT NULL,

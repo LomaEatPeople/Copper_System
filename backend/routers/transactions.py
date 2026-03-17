@@ -11,7 +11,8 @@ from services.transactions import (
     delete_transaction,
     remove_transaction_item,
     get_transaction_images,
-    upload_transaction_image
+    upload_transaction_image,
+    delete_transaction_image
 )
 
 from schemas.transactions import TransactionCreate, TransactionItemCreate, PriceUpdate
@@ -96,7 +97,7 @@ def delete_transaction_endpoint(id: int):
 def remove_transaction_item_endpoint(transaction_id: int, item_id: int):
     return remove_transaction_item(transaction_id, item_id)
 
-@router.post("/transactions/{id}/images")
+@router.patch("/transactions/{id}/images")
 def upload_transaction_image_endpoint(id: int, file: UploadFile = File(...)):
     return upload_transaction_image(id, file)
 
@@ -104,3 +105,7 @@ def upload_transaction_image_endpoint(id: int, file: UploadFile = File(...)):
 @router.get("/transactions/{id}/images")
 def get_transaction_images_endpoint(id: int):
     return get_transaction_images(id)
+
+@router.delete("/transactions/{id}/images/{image_id}")
+def delete_transaction_image_endpoint(id: int, image_id: int):
+    return delete_transaction_image(id, image_id)
