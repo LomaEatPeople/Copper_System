@@ -14,8 +14,11 @@ export default function BillManagementPage() {
   const [billItems, setBillItems] = useState<any[]>([]);
   const [storeItems, setStoreItems] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(true);
+  const [images, setImages] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" } | null>(null);
 
   const showToast = (msg: string, type: "success" | "error") => {
@@ -44,11 +47,19 @@ export default function BillManagementPage() {
       setLoading(false);
     }
   }, [transactionId]);
+  const fetchImages = useCallback(async () => {
+  try {
+    const res = await billService.getTransactionImages(transactionId);
+    setImages(Array.isArray(res.data) ? res.data : []);
+  } catch (error) {
+    console.error("Fetch images failed:", error);
+  }
+}, [transactionId]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
-
+    fetchImages();
+  }, [fetchData, fetchImages]);
   const handleAddItem = async () => {
     if (!selectedItemId || !weight) return alert("กรุณาเลือกสินค้าและระบุน้ำหนัก");
     try {
@@ -88,6 +99,36 @@ export default function BillManagementPage() {
       alert("ไม่สามารถยืนยันบิลได้");
     }
   };
+  const handleDeleteImage = async (imageId: number) => {
+    console.log("กำลังจะลบรูป ID:", imageId, "ของบิลเลขที่:", transactionId);
+    try {
+      const res = await billService.deleteTransactionImage(transactionId, imageId);
+      console.log("Backend ตอบกลับมาว่า:", res.data);
+      fetchImages(); // ดึงใหม่
+    } catch (error: any) {
+      console.error("Error ตอนลบ:", error.response?.data || error.message);
+      alert("ลบไม่ได้จ้า! ดูที่ Console นะ");
+    }
+  };
+
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    setUploading(true);
+    await billService.uploadTransactionImage(transactionId, formData);
+    showToast("อัปโหลดรูปสำเร็จ!", "success");
+    fetchImages(); // อัปโหลดเสร็จ ดึงรายการรูปใหม่มาโชว์
+  } catch (error) {
+    showToast("อัปโหลดรูปไม่สำเร็จ", "error");
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleDeleteItem = async (itemId: number) => {
     try {
@@ -98,6 +139,13 @@ export default function BillManagementPage() {
       showToast("Backend บอกว่าลบไม่ได้จ้า!", "error");
     }
   };
+
+  const isImageRequired = billItems.some((item) => {
+    const masterItem = storeItems.find((i: any) => i[0] === item.item_id);
+    return masterItem && masterItem[4] === 1; 
+  });
+
+  const isLocked = isImageRequired && images.length === 0;
 
   const getItemDisplay = (itemInBill: any) => {
     const masterItem = storeItems.find((i: any) => i[0] === itemInBill.item_id);
@@ -116,15 +164,13 @@ export default function BillManagementPage() {
         <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 flex justify-between items-center">
           <div>
             <button onClick={() => router.push('/transactions')} className="text-blue-600 font-bold mb-2 block hover:underline">← กลับหน้ารวม</button>
-            <h1 className="text-4xl font-black tracking-tight">Bill #{bill.transaction_id}</h1>
-            <p className="text-gray-400 font-medium">{new Date(bill.transaction_date).toLocaleString("th-TH")}</p>
+            <h1 className="text-4xl font-black tracking-tight">Billz</h1>
+            <p className="text-gray-400 font-medium text-2xl">{new Date(bill.transaction_date).toLocaleString("th-TH")}</p>
           </div>
           <div className={`px-6 py-2 rounded-full font-black uppercase shadow-sm ${bill.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
             {bill.status}
           </div>
         </div>
-
-        {/* ฟอร์มเพิ่มสินค้า (เน้นแค่เลือกของกับน้ำหนัก) */}
         {bill.status === "draft" && (
           <div className="bg-white p-6 rounded-3xl shadow-sm mb-6 flex gap-4 items-end">
             <div className="flex-1">
@@ -210,6 +256,7 @@ export default function BillManagementPage() {
                         <button onClick={() => handleDeleteItem(item.item_id)} className="text-red-300 hover:text-red-500 transition-colors font-bold text-sm">ลบออก</button>
                       </td>
                     )}
+                    <td></td>
                   </tr>
                 );
               })}
@@ -226,14 +273,93 @@ export default function BillManagementPage() {
               ฿{bill.total_cost.toLocaleString()}
             </div>
             
-            {bill.status === "draft" && billItems.length > 0 && (
+            <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 border border-white">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-sm font-black text-gray-800 uppercase italic">Evidence Photos</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                    {isImageRequired ? "⚠️ Required for controlled items" : "Optional for this bill"}
+                  </p>
+                </div>
+                <span className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black text-gray-500">
+                  {images.length} PHOTOS
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {images.map((img, idx) => (
+                  <div key={img.image_id || idx} className="group relative aspect-square bg-gray-50 rounded-2xl overflow-hidden border-2 border-gray-100 hover:border-blue-500 transition-all shadow-sm">
+                    <img
+                      src={`${billService.getAPIclient().defaults.baseURL}${img.image_url}`}
+                      alt="evidence" 
+                      className="w-full h-full object-cover" 
+                      // กรณีรูปโหลดไม่ขึ้น ให้โชว์สีเทาแทน
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=No+Image";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <a 
+                        href={`${billService.getAPIclient().defaults.baseURL}${img.image_url}`} 
+                        target="_blank" 
+                        className="text-white text-[10px] font-black uppercase bg-white/20 backdrop-blur-md px-3 py-1 rounded-full"
+                      >
+                        View Full
+                      </a>
+                    </div>
+                    {bill.status === "draft" && (
+                    <button 
+                      onClick={() => handleDeleteImage(img.image_id)}
+                      disabled={deletingImageId === img.image_id}
+                      // 🟢 CSS: สีขุ่นๆ (bg-white/40), ลอยมุมขวาบน (top-2 right-2), โชว์ชัดขึ้นตอน Hover group
+                      className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white/40 backdrop-blur-sm text-gray-500 opacity-80 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all z-10 ${
+                        deletingImageId === img.image_id ? "animate-pulse" : ""
+                      }`}
+                      title="ลบรูปภาพ"
+                    >
+                      {deletingImageId === img.image_id ? (
+                        <span className="text-[9px]">...</span>
+                      ) : (
+                        <span className="text-xl font-light">×</span> // ใช้เครื่องหมายคูณสวยๆ
+                      )}
+                    </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* ปุ่มอัปโหลดรูปใหม่ (Input แบบซ่อน) */}
+                {bill.status === "draft" && (
+                  <label className={`aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    isLocked ? "border-red-200 bg-red-50/50 text-red-400 hover:bg-red-50" : "border-gray-200 text-gray-400 hover:bg-gray-50 hover:border-blue-300"
+                  }`}>
+                    {uploading ? (
+                      <div className="animate-spin text-2xl font-black">...</div>
+                    ) : (
+                      <>
+                        <span className="text-3xl mb-1">+</span>
+                        <span className="text-[9px] font-black uppercase tracking-tighter text-center px-2">
+                          Add Photo
+                        </span>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} />
+                      </>
+                    )}
+                  </label>
+                )}
+              </div>
+            </div>
+              {bill.status === "draft" && billItems.length > 0 && (
               <button 
                 onClick={handleConfirm}
-                className="bg-green-600 text-white px-16 py-5 rounded-3xl text-2xl font-black shadow-xl shadow-green-200 hover:bg-green-700 hover:-translate-y-1 transition-all active:scale-95 active:translate-y-0"
+                disabled={isLocked} // 🟢 ล็อคปุ่มถ้ายังไม่ถ่ายรูป
+                className={`px-16 py-5 rounded-3xl text-2xl font-black transition-all shadow-xl ${
+                  isLocked 
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none" 
+                    : "bg-green-600 text-white hover:bg-green-700 hover:-translate-y-1 shadow-green-200"
+                }`}
               >
-                CONFIRM PAYMENT
+                {isLocked ? "PHOTO REQUIRED" : "CONFIRM PAYMENT"}
               </button>
-            )}
+                )}
           </div>
         </div>
       </div>

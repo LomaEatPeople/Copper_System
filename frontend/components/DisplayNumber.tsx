@@ -1,16 +1,15 @@
+// components/DisplayNumber.tsx
 type Props = {
-  index: number;
+  index: string | number;
   currentPage?: number;
   itemsPerPage?: number;
 };
 
-export default function DisplayNumber({ index, currentPage = 1, itemsPerPage = 0 }: Props) {
-  // คำนวณเลขลำดับเผื่ออนาคตมีการทำ Pagination (แบ่งหน้า)
-  const displayNumber = (currentPage - 1) * itemsPerPage + (index + 1);
-  
+export default function DisplayNumber({ index }: Props) {
+  // 🟢 ไม่ต้องมีสูตรคำนวณบวกเลขแล้ว เพราะ index ที่ส่งมาคือเลขที่ถูกต้องแล้วค่ะ
   return (
     <span className="font-mono font-bold text-gray-400">
-      {String(displayNumber).padStart(2, '0')}.
+      {index}.
     </span>
   );
 }

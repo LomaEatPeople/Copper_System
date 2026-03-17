@@ -42,8 +42,18 @@ export const billService = {
 },
 
   // ยืนยันบิล
-confirmTransaction: (id: number) => {
-  // ต้องเป็น .patch และต้องมี /confirm ต่อท้ายแบบนี้เท่านั้นค่ะ!
-  return apiClient.patch(`/transactions/${id}/confirm`, {});
-},
+  confirmTransaction: (id: number) => {
+    // ต้องเป็น .patch และต้องมี /confirm ต่อท้ายแบบนี้เท่านั้นค่ะ!
+    return apiClient.patch(`/transactions/${id}/confirm`, {});
+  },
+  uploadTransactionImage: (id: number, formData: FormData) => 
+    apiClient.patch(`/transactions/${id}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+  getTransactionImages: (id: number) => 
+    apiClient.get(`/transactions/${id}/images`),
+  deleteTransactionImage: (transactionId: number, imageId: number) => 
+    apiClient.delete(`/transactions/${transactionId}/images/${imageId}`),
+
+  getAPIclient: () => apiClient
 };

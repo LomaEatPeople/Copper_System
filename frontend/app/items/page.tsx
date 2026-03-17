@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { itemService } from "@/services/itemService";
-// 🟢 นำเข้าคอมโพเนนต์ที่คุณน้องมีอยู่แล้ว
+import CategoryManager from "@/components/CategoryManager";
 import DisplayNumber from "@/components/DisplayNumber";
 
 export default function ItemsPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newCatId, setNewCatId] = useState("");
@@ -59,11 +59,16 @@ export default function ItemsPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-3xl font-black tracking-tight">Store Items</h2>
-            {/* 🟢 ใช้ DisplayNumber โชว์จำนวนรวม */}
             <div className="text-gray-500 font-bold text-xs mt-1 flex items-center gap-1">
               TOTAL: <DisplayNumber index={items.length - 1} /> ITEMS
             </div>
           </div>
+          <button
+              onClick={() => setIsCatModalOpen(true)}
+              className="bg-white text-gray-900 px-6 py-3 rounded-2xl font-black hover:bg-gray-100 shadow-md transition-all active:scale-95"
+            >
+              CATEGORIES
+            </button>
           <button
             onClick={() => setIsModalOpen(true)}
             className="bg-gray-900 text-white px-8 py-3 rounded-2xl font-black hover:bg-blue-600 shadow-xl transition-all active:scale-95"
@@ -149,6 +154,10 @@ export default function ItemsPage() {
           </div>
         </div>
       )}
+      <CategoryManager 
+        isOpen={isCatModalOpen} 
+        onClose={() => setIsCatModalOpen(false)} 
+      />
     </div>
   );
 }

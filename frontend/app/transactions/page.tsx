@@ -11,6 +11,7 @@ type Transaction = {
   transaction_type: string;
   total_cost: number;
   status: string;
+  display_id?: string;
 };
 
 export default function TransactionsPage() {
@@ -42,15 +43,24 @@ export default function TransactionsPage() {
     try {
       setLoading(true);
       const response = await transactionService.getTransactions();
-      const data = response.data || response;
-      setTransactions(Array.isArray(data) ? data : []);
-      router.refresh(); 
+      let data = response.data || response;
+      
+      if (Array.isArray(data)) {
+        const mappedData = data.map((t: any, index: number) => ({
+          ...t,
+          // สร้างเลข Display ID เช่น "01", "02" เกาะติดกับ Object นี้ไปเลย
+          display_id: (data.length - index).toString().padStart(2, '0')
+        }));
+        setTransactions(mappedData);
+      } else {
+        setTransactions([]);
+      }
     } catch (error) {
       console.error("Fetch error:", error);
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     setMounted(true); // ยืนยันว่าหน้าจอพร้อมโหลด Date แล้ว
@@ -68,18 +78,18 @@ export default function TransactionsPage() {
     };
   }, [fetchTransactions]);
 
-  // จัดเรียงใน filteredTransactions ตามที่คุณน้องต้องการ
 const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
-      const date = parseDate(t.transaction_date);
-      const monthMatch = monthFilter === "all" || (date.getMonth() + 1) === Number(monthFilter);
-      const dayMatch = dayFilter === "all" || date.getDate() === Number(dayFilter);
-      const searchMatch = search === "" || t.transaction_id.toString().includes(search);
-      
-      return monthMatch && dayMatch && searchMatch;
-    });
-    // ตรงนี้ปล่อยให้มันเรียงตาม Backend (SQL DESC) มาเลยค่ะ
-  }, [transactions, monthFilter, dayFilter, search]);
+  return transactions.filter((t: any) => {
+    const date = parseDate(t.transaction_date);
+    const monthMatch = monthFilter === "all" || (date.getMonth() + 1) === Number(monthFilter);
+    const dayMatch = dayFilter === "all" || date.getDate() === Number(dayFilter);
+    
+    const searchMatch = search === "" || 
+                        t.display_id.includes(search);
+    
+    return monthMatch && dayMatch && searchMatch;
+  });
+}, [transactions, monthFilter, dayFilter, search]);
 
   const handleNewBill = async () => {
     try {
@@ -182,12 +192,11 @@ const filteredTransactions = useMemo(() => {
                 ) : (
                   filteredTransactions.map((t, index) => {
                     const dateObj = parseDate(t.transaction_date);
-                    const reverseIndex = (filteredTransactions.length - 1) - index;
                     return (
                       <tr key={t.transaction_id} className="hover:bg-blue-50/40 transition-colors group">
                         <td className="p-6 font-black text-blue-600 text-lg">
                           {/* ใช้ DisplayNumber รัน 01, 02 ให้สวยๆ */}
-                          <DisplayNumber index={reverseIndex} />
+                          <DisplayNumber index={Number(t.display_id) || 0} />
                         </td>
                         <td className="p-6">
                           <div className="text-xl font-black text-gray-900 leading-none mb-1">
