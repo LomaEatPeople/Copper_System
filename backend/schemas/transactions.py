@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 class TransactionCreate(BaseModel):
     user_id: int
+    transaction_type: str
     
 class TransactionItemCreate(BaseModel):
     item_id: int

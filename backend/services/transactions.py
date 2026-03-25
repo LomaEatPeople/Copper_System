@@ -57,10 +57,11 @@ def create_transaction(transaction):
         VALUES (?, ?, 'draft', 0, ?)
         """, (
             transaction.user_id,
-            TRANSACTION_TYPE_BUY,
-            th_time  # <--- ส่งเวลาไทยที่เราสร้างไว้เข้าไป
+            transaction.transaction_type,
+            th_time
         ))
 
+        conn.commit() # อย่าลืม commit ด้วยนะจ๊ะเพื่อความชัวร์
         return cursor.lastrowid
     
 def update_transaction_status(transaction_id, new_status):

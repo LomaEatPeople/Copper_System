@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from schemas.items import ItemCreate, ItemDelete
-from services.items import create_item, get_items, delete_item
+from services.items import create_item, get_items, delete_item, get_item_movement_history
 
 router = APIRouter()
 
@@ -22,3 +22,7 @@ def delete_item_endpoint(item: ItemDelete):
         "item_name": item["item_name"],
         "message": "Item deleted"
     }
+
+@router.get("/items/history/{item_id}")
+def item_history(item_id: int):
+    return get_item_movement_history(item_id)

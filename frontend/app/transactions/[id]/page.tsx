@@ -23,7 +23,7 @@ export default function BillManagementPage() {
 
   const showToast = (msg: string, type: "success" | "error") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 10000);
+    setTimeout(() => setToast(null), 3000);
   };
 
   const fetchData = useCallback(async () => {
@@ -47,23 +47,24 @@ export default function BillManagementPage() {
       setLoading(false);
     }
   }, [transactionId]);
+
   const fetchImages = useCallback(async () => {
-  try {
-    const res = await billService.getTransactionImages(transactionId);
-    setImages(Array.isArray(res.data) ? res.data : []);
-  } catch (error) {
-    console.error("Fetch images failed:", error);
-  }
-}, [transactionId]);
+    try {
+      const res = await billService.getTransactionImages(transactionId);
+      setImages(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Fetch images failed:", error);
+    }
+  }, [transactionId]);
 
   useEffect(() => {
     fetchData();
     fetchImages();
   }, [fetchData, fetchImages]);
+
   const handleAddItem = async () => {
     if (!selectedItemId || !weight) return alert("กรุณาเลือกสินค้าและระบุน้ำหนัก");
     try {
-      // เพิ่มสินค้า (ราคาจะยังเป็น NULL หรือ 0 ตาม Backend จนกว่าจะไปกรอกในตาราง)
       await billService.addItemToTransaction(transactionId, Number(selectedItemId), Number(weight));
       setSelectedItemId("");
       setWeight("");
@@ -74,21 +75,17 @@ export default function BillManagementPage() {
   };
 
   const handleUpdatePrice = async (itemId: number, newPrice: string) => {
-  const price = parseFloat(newPrice);
-  // ถ้าเป็นค่าว่าง หรือไม่ใช่ตัวเลข ไม่ต้องส่ง
-  if (isNaN(price)) return;
-
-  try {
-    // ยิง PATCH ไปที่ /transaction-items/price
-    await billService.updateItemPrice(transactionId, itemId, price);
-    
-    // สำคัญมาก: ต้องดึงข้อมูลใหม่เพื่อให้อัปเดต Total Cost ในหน้าจอ
-    fetchData(); 
-  } catch (error) {
-    console.error("Update price failed:", error);
-    alert("ไม่สามารถอัปเดตราคาได้");
-  }
+    const price = parseFloat(newPrice);
+    if (isNaN(price)) return;
+    try {
+      await billService.updateItemPrice(transactionId, itemId, price);
+      fetchData(); 
+    } catch (error) {
+      console.error("Update price failed:", error);
+      alert("ไม่สามารถอัปเดตราคาได้");
+    }
   };
+
   const handleConfirm = async () => {
     try {
       await billService.confirmTransaction(transactionId);
@@ -99,36 +96,35 @@ export default function BillManagementPage() {
       alert("ไม่สามารถยืนยันบิลได้");
     }
   };
+
   const handleDeleteImage = async (imageId: number) => {
-    console.log("กำลังจะลบรูป ID:", imageId, "ของบิลเลขที่:", transactionId);
     try {
-      const res = await billService.deleteTransactionImage(transactionId, imageId);
-      console.log("Backend ตอบกลับมาว่า:", res.data);
-      fetchImages(); // ดึงใหม่
+      setDeletingImageId(imageId);
+      await billService.deleteTransactionImage(transactionId, imageId);
+      fetchImages();
     } catch (error: any) {
-      console.error("Error ตอนลบ:", error.response?.data || error.message);
-      alert("ลบไม่ได้จ้า! ดูที่ Console นะ");
+      alert("ลบไม่ได้จ้า!");
+    } finally {
+      setDeletingImageId(null);
     }
   };
 
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  try {
-    setUploading(true);
-    await billService.uploadTransactionImage(transactionId, formData);
-    showToast("อัปโหลดรูปสำเร็จ!", "success");
-    fetchImages(); // อัปโหลดเสร็จ ดึงรายการรูปใหม่มาโชว์
-  } catch (error) {
-    showToast("อัปโหลดรูปไม่สำเร็จ", "error");
-  } finally {
-    setUploading(false);
-  }
-};
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      setUploading(true);
+      await billService.uploadTransactionImage(transactionId, formData);
+      showToast("อัปโหลดรูปสำเร็จ!", "success");
+      fetchImages();
+    } catch (error) {
+      showToast("อัปโหลดรูปไม่สำเร็จ", "error");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleDeleteItem = async (itemId: number) => {
     try {
@@ -148,226 +144,236 @@ export default function BillManagementPage() {
   const isLocked = isImageRequired && images.length === 0;
 
   const getItemDisplay = (itemInBill: any) => {
-    const masterItem = storeItems.find((i: any) => i[0] === itemInBill.item_id);
+    const masterItem = storeItems.find((i: any) => i.item_id === itemInBill.item_id);
     return {
-      name: masterItem ? masterItem[1] : (itemInBill.item_name || `สินค้า #${itemInBill.item_id}`)
+      name: masterItem ? masterItem.item_name : (itemInBill.item_name || `สินค้า #${itemInBill.item_id}`)
     };
   };
 
-  if (loading && !bill) return <div className="p-20 text-center font-bold">กำลังโหลด...</div>;
+  if (loading && !bill) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="animate-pulse font-black text-slate-300 tracking-[0.3em] uppercase">Loading Billy...</div>
+    </div>
+  );
+
   if (!bill) return <div className="p-20 text-center">ไม่พบข้อมูลบิล #{transactionId}</div>;
 
+  const isSell = bill.transaction_type?.toUpperCase() === 'SELL';
+
   return (
-    <div className="min-h-screen bg-[#dce8d8] p-4 md:p-10 text-gray-800 font-sans">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-12 text-slate-800 font-sans">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 flex justify-between items-center">
-          <div>
-            <button onClick={() => router.push('/transactions')} className="text-blue-600 font-bold mb-2 block hover:underline">← กลับหน้ารวม</button>
-            <h1 className="text-4xl font-black tracking-tight">Billz</h1>
-            <p className="text-gray-400 font-medium text-2xl">{new Date(bill.transaction_date).toLocaleString("th-TH")}</p>
-          </div>
-          <div className={`px-6 py-2 rounded-full font-black uppercase shadow-sm ${bill.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-            {bill.status}
+        
+        {/* 🟢 Navigation & Status Bar */}
+        <div className="flex justify-between items-center mb-8">
+          <button 
+            onClick={() => router.push('/transactions')} 
+            className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors"
+          >
+            <span className="text-lg group-hover:-translate-x-1 transition-transform">←</span> Back to Transactions
+          </button>
+          <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-sm border ${
+            bill.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+          }`}>
+            Status: {bill.status}
           </div>
         </div>
+
+        {/* 🟢 Bill Header Card */}
+        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-sm mb-8 border border-slate-200 relative overflow-hidden">
+          <div className={`absolute top-0 left-0 w-full h-2 ${isSell ? 'bg-blue-500' : 'bg-orange-500'}`} />
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-5xl font-black tracking-tighter text-slate-950">Billy ที่ {transactionId.toString().padStart(4, '0')}</h1>
+                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                  isSell ? "bg-blue-600 text-white" : "bg-orange-500 text-white"
+                }`}>
+                  {isSell ? '📤 SELL BILL' : '📥 BUY BILL'}
+                </span>
+              </div>
+              <p className="text-slate-400 font-bold text-sm flex items-center gap-2">
+                <span>🗓️</span> {new Date(bill.transaction_date).toLocaleString("th-TH", { dateStyle: 'long', timeStyle: 'short' })} น.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1">Total Balance</p>
+              <div className="text-5xl font-black text-slate-950 tracking-tighter">
+                <span className="text-xl mr-1 text-slate-300 italic font-bold text-2xl tracking-normal">฿</span>
+                {bill.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 🟢 Input Form: Styled as a clean control panel */}
         {bill.status === "draft" && (
-          <div className="bg-white p-6 rounded-3xl shadow-sm mb-6 flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">รายการสินค้า</label>
+          <div className="bg-slate-900 p-2 rounded-[2rem] shadow-2xl mb-8 flex flex-col md:flex-row gap-2 items-center">
+            <div className="flex-1 w-full">
               <select 
-                className="w-full border-none bg-gray-50 rounded-2xl px-4 py-4 outline-none focus:ring-2 focus:ring-blue-500 font-bold transition-all"
+                className="w-full bg-slate-800 text-white border-none rounded-[1.5rem] px-6 py-4 outline-none focus:ring-2 focus:ring-blue-500 font-bold transition-all appearance-none cursor-pointer"
                 value={selectedItemId}
                 onChange={(e) => setSelectedItemId(e.target.value)}
               >
-                <option value="">เลือกสินค้า...</option>
+                <option value="">Select Item...</option>
                 {storeItems.map((item: any) => (
-                  <option key={item[0]} value={item[0]}>{item[1]}</option>
+                  <option key={item.item_id} value={item.item_id}>{item.item_name}</option>
                 ))}
               </select>
             </div>
-            <div className="w-40">
-              <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">น้ำหนัก (กก.)</label>
+            <div className="w-full md:w-48 relative">
               <input 
                 type="number" 
                 placeholder="0.00" 
-                className="w-full border-none bg-gray-50 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-center"
+                className="w-full bg-slate-800 text-white border-none p-4 rounded-[1.5rem] outline-none focus:ring-2 focus:ring-blue-500 font-black text-center text-xl"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
               />
+              <span className="absolute right-6 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-500">KG</span>
             </div>
             <button 
               onClick={handleAddItem} 
-              className="bg-gray-900 text-white px-10 py-4 rounded-2xl font-black hover:bg-blue-600 transition-all active:scale-95 h-[60px]"
+              className={`w-full md:w-auto px-12 py-4 rounded-[1.5rem] font-black text-white transition-all active:scale-95 h-full min-h-[60px] uppercase tracking-widest ${
+                isSell ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-500 hover:bg-orange-600'
+              }`}
             >
-              ADD
+              Add Item
             </button>
           </div>
         )}
 
-        {/* ตารางรายการสินค้า */}
-        <div className="bg-white rounded-3xl shadow-sm overflow-hidden border border-white">
+        {/* 🟢 Items Table: High-End Look */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-slate-200 mb-8">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
+            <thead className="bg-slate-50/80 border-b border-slate-100">
               <tr>
-                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">รายการ</th>
-                <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">น้ำหนัก</th>
-                <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">ราคา/กก.</th>
-                <th className="p-6 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">รวม</th>
-                {bill.status === "draft" && <th className="p-6 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">จัดการ</th>}
+                <th className="p-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Product</th>
+                <th className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Quantity</th>
+                <th className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Unit Price</th>
+                <th className="p-8 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Subtotal</th>
+                {bill.status === "draft" && <th className="p-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Action</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {billItems.map((item: any) => {
-                const display = getItemDisplay(item);
-                const itemPrice = item.price_per_kg || 0;
-                return (
-                  <tr key={item.item_id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="p-6 font-black text-gray-800 text-lg uppercase">{display.name}</td>
-                    <td className="p-6 text-center font-mono text-2xl font-bold text-gray-600">
-                      {item.weight} <span className="text-[10px] font-black text-gray-300">KG</span>
-                    </td>
-                    
-                    {/* แก้ไขราคาได้ในตาราง */}
-                    <td className="p-6 text-center">
-                      <div className="inline-flex items-center bg-gray-50 rounded-xl px-3 py-1 border border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all">
-                        <span className="text-blue-300 font-black mr-1">฿</span>
-                        <input
-                          type="number"
-                          defaultValue={item.price_per_kg || ""}
-                          placeholder="0"
-                          className="w-20 text-center bg-transparent outline-none font-black text-blue-600 text-xl"
-                          onBlur={(e) => handleUpdatePrice(item.item_id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur();
-                            }
-                          }}
-                        />
-                      </div>
-                    </td>
-
-                    <td className="p-6 text-right font-black text-gray-900 text-2xl">
-                      ฿{(item.weight * itemPrice).toLocaleString()}
-                    </td>
-                    
-                    {bill.status === "draft" && (
-                      <td className="p-6 text-center">
-                        <button onClick={() => handleDeleteItem(item.item_id)} className="text-red-300 hover:text-red-500 transition-colors font-bold text-sm">ลบออก</button>
+            <tbody className="divide-y divide-slate-50">
+              {billItems.length === 0 ? (
+                <tr><td colSpan={5} className="p-20 text-center text-slate-300 font-bold italic">No items added yet.</td></tr>
+              ) : (
+                billItems.map((item: any) => {
+                  const display = getItemDisplay(item);
+                  const itemPrice = item.price_per_kg || 0;
+                  return (
+                    <tr key={item.item_id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="p-8 font-extrabold text-slate-900 text-xl tracking-tight uppercase">{display.name}</td>
+                      <td className="p-8 text-center">
+                        <span className="text-2xl font-black text-slate-700">{item.weight.toLocaleString()}</span>
+                        <span className="ml-1 text-[10px] font-black text-slate-300 uppercase">kg</span>
                       </td>
-                    )}
-                    <td></td>
-                  </tr>
-                );
-              })}
-              {billItems.length === 0 && (
-                <tr><td colSpan={5} className="p-20 text-center text-gray-300 font-bold italic tracking-widest uppercase">No Items Found</td></tr>
+                      <td className="p-8 text-center">
+                        <div className={`inline-flex items-center rounded-xl px-4 py-2 border transition-all ${
+                          bill.status === "draft" ? "bg-slate-50 border-slate-100 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100" : "bg-transparent border-transparent"
+                        }`}>
+                          <span className="text-slate-300 font-black mr-2 text-xs italic">฿</span>
+                          <input
+                            type="number"
+                            disabled={bill.status !== "draft"}
+                            defaultValue={item.price_per_kg || ""}
+                            className="w-24 text-center bg-transparent outline-none font-black text-slate-900 text-xl disabled:text-slate-400"
+                            onBlur={(e) => handleUpdatePrice(item.item_id, e.target.value)}
+                          />
+                        </div>
+                      </td>
+                      <td className="p-8 text-right font-black text-slate-950 text-2xl tracking-tighter">
+                        <span className="text-xs text-slate-300 mr-1 italic">฿</span>
+                        {(item.weight * itemPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      {bill.status === "draft" && (
+                        <td className="p-8 text-center">
+                          <button onClick={() => handleDeleteItem(item.item_id)} className="w-10 h-10 flex items-center justify-center rounded-xl text-red-300 hover:text-red-500 hover:bg-red-50 transition-all font-bold">✕</button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* 🟢 Evidence & Confirmation Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
           
-          {/* Footer สรุปยอด */}
-          <div className="p-8 bg-gray-50/50 text-right border-t border-gray-100 shadow-[inner_0_2px_4px_rgba(0,0,0,0.02)]">
-            <p className="text-gray-400 font-black uppercase text-[10px] tracking-[0.2em] mb-1">ยอดรวมสุทธิ</p>
-            <div className="text-6xl font-black text-gray-900 mb-8 tracking-tighter">
-              ฿{bill.total_cost.toLocaleString()}
+          {/* Left: Evidence Photos */}
+          <div className="md:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Evidence Required</h3>
+                <p className="text-lg font-extrabold text-slate-900 tracking-tight">Transaction Photos</p>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-[10px] font-black ${isImageRequired ? 'bg-rose-50 text-rose-500 border border-rose-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                {isImageRequired ? "REQUIRED" : "OPTIONAL"}
+              </div>
             </div>
             
-            <div className="bg-white p-8 rounded-3xl shadow-sm mb-6 border border-white">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-sm font-black text-gray-800 uppercase italic">Evidence Photos</h3>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                    {isImageRequired ? "⚠️ Required for controlled items" : "Optional for this bill"}
-                  </p>
-                </div>
-                <span className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black text-gray-500">
-                  {images.length} PHOTOS
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {images.map((img, idx) => (
-                  <div key={img.image_id || idx} className="group relative aspect-square bg-gray-50 rounded-2xl overflow-hidden border-2 border-gray-100 hover:border-blue-500 transition-all shadow-sm">
-                    <img
-                      src={`${billService.getAPIclient().defaults.baseURL}${img.image_url}`}
-                      alt="evidence" 
-                      className="w-full h-full object-cover" 
-                      // กรณีรูปโหลดไม่ขึ้น ให้โชว์สีเทาแทน
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=No+Image";
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <a 
-                        href={`${billService.getAPIclient().defaults.baseURL}${img.image_url}`} 
-                        target="_blank" 
-                        className="text-white text-[10px] font-black uppercase bg-white/20 backdrop-blur-md px-3 py-1 rounded-full"
-                      >
-                        View Full
-                      </a>
-                    </div>
-                    {bill.status === "draft" && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {images.map((img) => (
+                <div key={img.image_id} className="group relative aspect-square bg-slate-50 rounded-[1.5rem] overflow-hidden border border-slate-100">
+                  <img src={`${billService.getAPIclient().defaults.baseURL}${img.image_url}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                  {bill.status === "draft" && (
                     <button 
                       onClick={() => handleDeleteImage(img.image_id)}
-                      disabled={deletingImageId === img.image_id}
-                      // 🟢 CSS: สีขุ่นๆ (bg-white/40), ลอยมุมขวาบน (top-2 right-2), โชว์ชัดขึ้นตอน Hover group
-                      className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white/40 backdrop-blur-sm text-gray-500 opacity-80 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all z-10 ${
-                        deletingImageId === img.image_id ? "animate-pulse" : ""
-                      }`}
-                      title="ลบรูปภาพ"
-                    >
-                      {deletingImageId === img.image_id ? (
-                        <span className="text-[9px]">...</span>
-                      ) : (
-                        <span className="text-xl font-light">×</span> // ใช้เครื่องหมายคูณสวยๆ
-                      )}
-                    </button>
-                    )}
-                  </div>
-                ))}
+                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 text-red-500 font-bold shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >×</button>
+                  )}
+                </div>
+              ))}
+              {bill.status === "draft" && (
+                <label className={`aspect-square rounded-[1.5rem] border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-slate-50 ${isLocked ? "border-rose-200 bg-rose-50/30" : "border-slate-200"}`}>
+                  <span className="text-3xl text-slate-300 font-light">+</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase mt-1">Upload</span>
+                  <input type="file" className="hidden" onChange={handleUploadImage} />
+                </label>
+              )}
+            </div>
+          </div>
 
-                {/* ปุ่มอัปโหลดรูปใหม่ (Input แบบซ่อน) */}
-                {bill.status === "draft" && (
-                  <label className={`aspect-square rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
-                    isLocked ? "border-red-200 bg-red-50/50 text-red-400 hover:bg-red-50" : "border-gray-200 text-gray-400 hover:bg-gray-50 hover:border-blue-300"
-                  }`}>
-                    {uploading ? (
-                      <div className="animate-spin text-2xl font-black">...</div>
-                    ) : (
-                      <>
-                        <span className="text-3xl mb-1">+</span>
-                        <span className="text-[9px] font-black uppercase tracking-tighter text-center px-2">
-                          Add Photo
-                        </span>
-                        <input type="file" className="hidden" accept="image/*" onChange={handleUploadImage} />
-                      </>
-                    )}
-                  </label>
-                )}
+          {/* Right: Confirmation Box */}
+          <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl flex flex-col justify-between border border-slate-800">
+            <div>
+              <p className="text-slate-500 font-black uppercase text-[10px] tracking-widest mb-2">Grand Total</p>
+              <div className="text-4xl font-black text-white tracking-tighter mb-8 leading-none">
+                <span className="text-lg text-slate-600 mr-1 italic">฿</span>
+                {bill.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </div>
             </div>
-              {bill.status === "draft" && billItems.length > 0 && (
+
+            {bill.status === "draft" && billItems.length > 0 ? (
               <button 
                 onClick={handleConfirm}
-                disabled={isLocked} // 🟢 ล็อคปุ่มถ้ายังไม่ถ่ายรูป
-                className={`px-16 py-5 rounded-3xl text-2xl font-black transition-all shadow-xl ${
+                disabled={isLocked}
+                className={`w-full py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 ${
                   isLocked 
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none" 
-                    : "bg-green-600 text-white hover:bg-green-700 hover:-translate-y-1 shadow-green-200"
+                    ? "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700" 
+                    : isSell
+                      ? "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-900/40"
+                      : "bg-emerald-500 text-white hover:bg-emerald-400 shadow-emerald-900/40"
                 }`}
               >
-                {isLocked ? "PHOTO REQUIRED" : "CONFIRM PAYMENT"}
+                {isLocked ? "Upload Photo First" : "Confirm Bill"}
               </button>
-                )}
+            ) : (
+              <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest text-center border border-slate-800 py-4 rounded-2xl italic">
+                {bill.status === "confirmed" ? "✓ Bill Confirmed" : "Add items to confirm"}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
       {toast && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[999] px-8 py-4 rounded-2xl shadow-2xl font-black text-white animate-bounce ${
-          toast.type === "error" ? "bg-red-500" : "bg-green-600"
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[999] px-10 py-5 rounded-[2rem] shadow-2xl font-black text-white transition-all animate-bounce flex items-center gap-3 ${
+          toast.type === "error" ? "bg-rose-500" : "bg-emerald-600"
         }`}>
-          {toast.msg}
+          <span>{toast.type === "error" ? "❌" : "✅"}</span> {toast.msg}
         </div>
       )}
     </div>

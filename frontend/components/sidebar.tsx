@@ -38,7 +38,7 @@ export default function Sidebar() {
       {/* Menu */}
       <nav className="space-y-2"> {/* ปรับช่องไฟให้ชิดขึ้นหน่อยเพื่อความสวยงาม */}
 
-        <Link href="/" className={getLinkStyle("/")}>
+        <Link href="/dashboard" className={getLinkStyle("/dashboard")}>
           Dashboard
         </Link>
 
@@ -50,7 +50,7 @@ export default function Sidebar() {
           Items
         </Link>
 
-        <Link href="/stock" className={getLinkStyle("/stock")}>
+        <Link href="/stocks" className={getLinkStyle("/stock")}>
           Stock
         </Link>
 
