@@ -1,60 +1,84 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // ตัวช่วยเช็คว่าตอนนี้อยู่หน้าไหน
+import { usePathname } from "next/navigation"; 
 
 export default function Sidebar() {
-  const pathname = usePathname(); // ดึง Path ปัจจุบันมาเก็บไว้
+  const pathname = usePathname();
 
-  // ฟังก์ชันช่วยจัดการ Class (ถ้า Path ตรงกัน ให้ใช้สีเข้ม)
   const getLinkStyle = (path: string) => {
+    // เช็คว่า path ปัจจุบันตรงกับเมนูไหม
     const isActive = pathname === path || (path !== "/" && pathname.startsWith(path));
     
-    return `block px-4 py-3 rounded-2xl transition-all duration-200 ${
+    return `block px-6 py-4 rounded-[1.5rem] transition-all duration-300 mb-2 ${
       isActive 
-        ? "bg-[#8ba88b] text-black font-black shadow-inner" // ตอน Active: พื้นหลังเข้มขึ้น + ตัวหนา + มีเงาข้างในเล็กๆ
-        : "text-gray-700 hover:bg-[#b5cdb5] hover:text-black font-medium" // ตอนปกติ: สีจางกว่า + Hover แล้วเข้มขึ้นนิดนึง
+        ? "bg-slate-900 text-white font-black shadow-xl translate-x-2" // ตอน Active: ให้สีตัดกับพื้นหลังและขยับออกมานิดนึง
+        : "text-gray-700 hover:bg-[#8ba88b]/30 hover:text-black font-bold uppercase text-[12px] tracking-widest"
     }`;
   };
 
   return (
-      <aside className="w-64 min-h-screen bg-[#a7c3a7] p-6 shadow-lg">
+      <aside className="
+        hidden               /* 📱 ซ่อนใน Tablet และมือถือ */
+        lg:block             /* 💻 โชว์เฉพาะหน้าจอ Desktop (1024px+) */
+        w-72 
+        min-h-screen 
+        bg-[#a7c3a7] 
+        p-8 
+        shadow-[10px_0_30px_rgba(0,0,0,0.05)] 
+        sticky 
+        top-0 
+        z-50
+      ">
 
-            {/* Logo Section */}
-            <div className="mb-10 pb-4 border-b border-[#8ba88b]">
-              <div className="flex items-center gap-3">
-                {/* แก้ไข path ตรงนี้: ตัด /public ออกนะคะ */}
-                <img 
-                  src="/Logo.png" 
-                  alt="Logo" 
-                  className="w-10 h-10 object-contain rounded-lg" 
-                />
-                <h1 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">
-                  PARINYA
-                </h1>
-              </div>
+        {/* Logo Section */}
+        <div className="mb-12 pb-6 border-b border-[#8ba88b]/50">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-white rounded-2xl shadow-sm">
+              <img 
+                src="/Logo.png" 
+                alt="Logo" 
+                className="w-10 h-10 object-contain" 
+              />
             </div>
+            <div>
+              <h1 className="text-2xl font-black text-gray-800 tracking-tighter leading-none">
+                PARINYA
+              </h1>
+              <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em]">Management</span>
+            </div>
+          </div>
+        </div>
 
-      {/* Menu */}
-      <nav className="space-y-2"> {/* ปรับช่องไฟให้ชิดขึ้นหน่อยเพื่อความสวยงาม */}
+        {/* Menu Title */}
+        <p className="text-[10px] font-black text-[#6d8a6d] uppercase tracking-[0.4em] mb-6 ml-2">Main Menu</p>
 
-        <Link href="/dashboard" className={getLinkStyle("/dashboard")}>
-          Dashboard
-        </Link>
+        {/* Navigation */}
+        <nav className="space-y-1">
+          <Link href="/dashboard" className={getLinkStyle("/dashboard")}>
+            <span className="mr-3 text-lg">📊</span> Dashboard
+          </Link>
 
-        <Link href="/transactions" className={getLinkStyle("/transactions")}>
-          Transactions
-        </Link>
+          <Link href="/transactions" className={getLinkStyle("/transactions")}>
+            <span className="mr-3 text-lg">📝</span> Transactions
+          </Link>
 
-        <Link href="/items" className={getLinkStyle("/items")}>
-          Items
-        </Link>
+          <Link href="/items" className={getLinkStyle("/items")}>
+            <span className="mr-3 text-lg">📦</span> Store Items
+          </Link>
 
-        <Link href="/stocks" className={getLinkStyle("/stock")}>
-          Stock
-        </Link>
+          <Link href="/stocks" className={getLinkStyle("/stocks")}>
+            <span className="mr-3 text-lg">📈</span> Stock & Margin
+          </Link>
+        </nav>
 
-      </nav>
+        {/* Footer Info */}
+        <div className="absolute bottom-10 left-8 right-8 p-6 bg-[#8ba88b]/20 rounded-[2rem] border border-[#8ba88b]/30">
+          <p className="text-[9px] font-black text-[#5a735a] uppercase tracking-widest leading-relaxed">
+            Logged in as Admin<br/>
+            v2.6.0 Stable
+          </p>
+        </div>
 
     </aside>
   );
