@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { billService } from "@/services/billService";
 import { itemService } from "@/services/itemService";
+import { useReactToPrint } from "react-to-print";
+import { ReceiptTicket } from "@/components/Reciept";
 
 export default function BillManagementPage() {
   const { id } = useParams();
@@ -20,6 +22,9 @@ export default function BillManagementPage() {
   const [images, setImages] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" } | null>(null);
+  
+  // 🟢 เพิ่ม Ref แค่จุดเดียว
+  const componentRef = useRef<HTMLDivElement>(null);
 
   // 🔵 Tablet Specific States
   const [isTabletMode, setIsTabletMode] = useState(false);
@@ -70,6 +75,12 @@ export default function BillManagementPage() {
     window.addEventListener("resize", checkSize);
     return () => window.removeEventListener("resize", checkSize);
   }, [fetchData, fetchImages]);
+
+  // 🟢 เพิ่มฟังก์ชัน Print ตรงๆ ตามคู่มือ Library
+  const handlePrint = useReactToPrint({
+    contentRef: componentRef,
+    documentTitle: `Bill-${transactionId}`,
+  });
 
   const handleAddItem = async () => {
     if (!selectedItemId || !weight) return alert("กรุณาเลือกสินค้าและระบุน้ำหนัก");
@@ -179,18 +190,42 @@ export default function BillManagementPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-12 text-slate-800 font-sans">
+      
+      {/* 🟢 ส่วนที่ซ่อนไว้สำหรับ Print (ห้ามลบ) */}
+      <div className="hidden">
+        <ReceiptTicket 
+          ref={componentRef} 
+          bill={bill} 
+          billItems={billItems} 
+          storeItems={storeItems} 
+        />
+      </div>
+
       <div className="max-w-4xl mx-auto">
         
         {/* Navigation & Header */}
         <div className="flex justify-between items-center mb-6">
           <button onClick={() => router.push('/transactions')} className="font-black text-[10px] uppercase tracking-widest text-slate-400">← กลับไปรายการบิล</button>
-          <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-            bill.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
-          }`}>
-            {bill.status === 'confirmed' ? 'ยืนยันบิลแล้ว' : 'ฉบับร่าง'}
+          
+          {/* 🟢 เพิ่มปุ่ม Print ไว้ข้างๆ สถานะบิล */}
+          <div className="flex items-center gap-3">
+            {bill.status === "confirmed" && (
+              <button 
+                onClick={handlePrint}
+                className="px-4 py-1.5 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 active:scale-95 transition-all"
+              >
+                🖨️ พิมพ์บิล
+              </button>
+            )}
+            <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+              bill.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+            }`}>
+              {bill.status === 'confirmed' ? 'ยืนยันบิลแล้ว' : 'ฉบับร่าง'}
+            </div>
           </div>
         </div>
 
+        {/* ... ส่วนที่เหลือคงเดิมตามโค้ดของคุณหลานทุกประการ ... */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm mb-6 border border-slate-200 relative overflow-hidden">
           <div className={`absolute top-0 left-0 w-full h-2 ${isSell ? 'bg-blue-500' : 'bg-orange-500'}`} />
           <div className="flex justify-between items-center">
@@ -341,17 +376,11 @@ export default function BillManagementPage() {
                     {isTabletMode ? "ถ่ายรูป / คลัง" : "เพิ่มรูป"}
                   </span>
                   
-                  {/* 🔵 จุดสำคัญอยู่ตรงนี้ค่ะคุณหลาน! */}
                   <input 
                     type="file" 
                     className="hidden" 
                     accept="image/*" 
                     onChange={handleUploadImage}
-                    /* ถ้าไม่ใส่ capture="environment" บน Tablet/มือถือ 
-                      มันจะเด้งเมนูมาให้เลือกว่าจะ "Camera" หรือ "Photo Library" เองเลยค่ะ 
-                      แต่ถ้าใส่ capture มันจะบังคับเปิดกล้องทันที 
-                      ดังนั้นเรา "ไม่ต้องใส่ capture" เพื่อให้มันถามเลือกได้ค่ะ
-                    */
                   />
                 </label>
               )}

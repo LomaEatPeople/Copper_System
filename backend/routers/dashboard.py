@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 service = DashboardService()
 
 @router.get("/summary", response_model=DashboardResponse)
-async def get_summary(date: str, mode: str = Query("daily", regex="^(daily|monthly)$")):
+async def get_summary(date: str, mode: str = Query("daily", pattern="^(daily|monthly)$")):
     try:
         data = service.get_summary(date, mode)
         return {"status": "success", "data": data}
