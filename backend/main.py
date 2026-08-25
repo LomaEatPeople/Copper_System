@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from routers import items, transactions,categorys,stocks,dashboard
+from init_db import init_db
 
 app = FastAPI()
+init_db()
 
 app.add_middleware(
     CORSMiddleware,

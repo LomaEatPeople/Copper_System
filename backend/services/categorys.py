@@ -19,10 +19,14 @@ def create_category(category: CategoryCreate):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO categories (name) VALUES (?)", (category.name,))
+        require_image = category.require_image if category.require_image is not None else 0
+        cursor.execute(
+            "INSERT INTO categories (name, require_image) VALUES (?, ?)",
+            (category.name, require_image)
+        )
         new_id = cursor.lastrowid
         conn.commit()
-        return {"category_id": new_id, "name": category.name}
+        return {"category_id": new_id, "name": category.name, "require_image": require_image}
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))

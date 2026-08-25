@@ -66,12 +66,37 @@ def init_db():
         item_name TEXT,
         weight REAL NOT NULL,
         price_per_kg REAL NULL,
+        quantity_remaining REAL NULL,
+        cut_status TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id),
         FOREIGN KEY (item_id) REFERENCES items(item_id),
         FOREIGN KEY (item_name) REFERENCES items(item_name)
     )
     """)
+
+    # sell_buy_offsets — audit trail: which sell consumed which buy, and how much
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sell_buy_offsets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sell_item_id INTEGER NOT NULL,
+        buy_item_id  INTEGER NOT NULL,
+        quantity_offset REAL NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sell_item_id) REFERENCES transaction_items(id),
+        FOREIGN KEY (buy_item_id)  REFERENCES transaction_items(id)
+    )
+    """)
+
+    # Migration for existing databases: add columns if they don't exist yet
+    for col, definition in [
+        ("quantity_remaining", "REAL NULL"),
+        ("cut_status",         "TEXT NULL"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE transaction_items ADD COLUMN {col} {definition}")
+        except Exception:
+            pass  # column already exists
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS transaction_images (

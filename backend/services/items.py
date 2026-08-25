@@ -27,7 +27,8 @@ def create_item(item):
             VALUES (?, ?)
         """, (item.item_name, item.category_id))
         conn.commit()
-        return cursor.lastrowid
+        new_id = cursor.lastrowid
+        return {"item_id": new_id, "item_name": item.item_name, "category_id": item.category_id}
 
 def update_item_price(item_id, new_price):
     with get_db_connection() as conn:

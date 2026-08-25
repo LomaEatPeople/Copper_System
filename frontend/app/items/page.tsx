@@ -92,7 +92,7 @@ export default function ItemsPage() {
               <span>📁</span> Categories
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => { fetchCategories(); setIsModalOpen(true); }}
               className="flex-[2] md:flex-none bg-slate-900 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-600 shadow-xl shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 text-sm uppercase tracking-widest"
             >
               <span>+</span> Add New Item
@@ -227,9 +227,9 @@ export default function ItemsPage() {
       )}
 
       {/* เรียกใช้ Component เดิมของคุณหลาน */}
-      <CategoryManager 
-        isOpen={isCatModalOpen} 
-        onClose={() => setIsCatModalOpen(false)} 
+      <CategoryManager
+        isOpen={isCatModalOpen}
+        onClose={() => { setIsCatModalOpen(false); fetchCategories(); }}
       />
     </div>
   );

@@ -1,10 +1,12 @@
 import sqlite3
 import shutil
 import os
+from decimal import Decimal
 from fastapi import UploadFile, File
 from datetime import datetime, timedelta
 
 TRANSACTION_TYPE_BUY = "buy"
+TRANSACTION_TYPE_SELL = "sell"
 UPLOAD_DIR = "uploads"
 
 def status_checker(transaction_id):
@@ -192,18 +194,116 @@ def update_item_price_and_sync_total(transaction_id, item_id, new_price):
         return {"status": "success", "new_total": new_total}
     
 def confirm_transaction(transaction_id):
-    """ยืนยันบิลและบันทึกยอดรวมสุดท้าย"""
-    total = calculate_total_cost(transaction_id)
+    """ยืนยันบิล, รัน FIFO offset สำหรับ SELL, บันทึกยอดรวมสุดท้าย"""
+    ensure_draft(transaction_id)
 
-    with sqlite3.connect("parinya.db") as conn:
-        cursor = conn.cursor()
+    # isolation_level=None = autocommit off; we manage BEGIN/COMMIT manually
+    conn = sqlite3.connect("parinya.db", isolation_level=None)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    try:
+        # BEGIN IMMEDIATE = SQLite write-lock; blocks concurrent SELL confirms
+        cursor.execute("BEGIN IMMEDIATE")
+
+        # 1. Fetch transaction header
+        cursor.execute(
+            "SELECT transaction_type FROM transactions WHERE transaction_id = ?",
+            (transaction_id,)
+        )
+        tx = cursor.fetchone()
+        if not tx:
+            raise ValueError("Transaction not found")
+        tx_type = tx["transaction_type"].lower()
+
+        # 2. Calculate total using Decimal to avoid float errors
+        cursor.execute(
+            "SELECT id, item_id, weight, price_per_kg FROM transaction_items WHERE transaction_id = ?",
+            (transaction_id,)
+        )
+        items = cursor.fetchall()
+        total = sum(
+            Decimal(str(row["weight"])) * Decimal(str(row["price_per_kg"] or 0))
+            for row in items
+        )
+
+        # 3a. BUY confirmation — activate items for future SELL offsetting
+        if tx_type == TRANSACTION_TYPE_BUY:
+            cursor.execute("""
+                UPDATE transaction_items
+                SET quantity_remaining = weight,
+                    cut_status = 'OPEN'
+                WHERE transaction_id = ?
+            """, (transaction_id,))
+
+        # 3b. SELL confirmation — FIFO deduction against open BUY items (last 30 days)
+        elif tx_type == TRANSACTION_TYPE_SELL:
+            for sell_item in items:
+                sell_item_id   = sell_item["id"]
+                item_id_val    = sell_item["item_id"]
+                remaining_sell = Decimal(str(sell_item["weight"]))
+
+                # Fetch eligible BUY items: same item, confirmed, last 30 days, FIFO
+                cursor.execute("""
+                    SELECT ti.id, ti.quantity_remaining
+                    FROM transaction_items ti
+                    JOIN transactions t ON ti.transaction_id = t.transaction_id
+                    WHERE ti.item_id = ?
+                      AND t.transaction_type = ?
+                      AND t.status = 'confirmed'
+                      AND ti.quantity_remaining > 0
+                      AND t.transaction_date >= datetime('now', '-30 days', 'localtime')
+                    ORDER BY t.transaction_date ASC
+                """, (item_id_val, TRANSACTION_TYPE_BUY))
+                buy_rows = cursor.fetchall()
+
+                for buy_row in buy_rows:
+                    if remaining_sell <= Decimal("0"):
+                        break
+
+                    buy_item_id   = buy_row["id"]
+                    buy_remaining = Decimal(str(buy_row["quantity_remaining"]))
+                    deduct        = min(buy_remaining, remaining_sell)
+                    new_remaining = buy_remaining - deduct
+
+                    new_cut_status = "CLOSED" if new_remaining == Decimal("0") else "PARTIAL"
+
+                    cursor.execute("""
+                        UPDATE transaction_items
+                        SET quantity_remaining = ?,
+                            cut_status = ?
+                        WHERE id = ?
+                    """, (str(new_remaining), new_cut_status, buy_item_id))
+
+                    cursor.execute("""
+                        INSERT INTO sell_buy_offsets (sell_item_id, buy_item_id, quantity_offset)
+                        VALUES (?, ?, ?)
+                    """, (sell_item_id, buy_item_id, str(deduct)))
+
+                    remaining_sell -= deduct
+
+                if remaining_sell > Decimal("0"):
+                    raise ValueError(
+                        f"Insufficient BUY stock for item_id={item_id_val}. "
+                        f"Short by {remaining_sell} kg within the last 30 days."
+                    )
+
+        # 4. Confirm the transaction itself
         cursor.execute("""
             UPDATE transactions
             SET total_cost = ?, status = 'confirmed'
             WHERE transaction_id = ?
-        """, (total, transaction_id))
-        conn.commit()
-        return {"message": "Transaction confirmed", "total_cost": total}
+        """, (str(total), transaction_id))
+
+        cursor.execute("COMMIT")
+        return {"message": "Transaction confirmed", "total_cost": float(total)}
+
+    except Exception as exc:
+        cursor.execute("ROLLBACK")
+        raise exc
+
+    finally:
+        conn.close()
     
 def calculate_transaction_total(transaction_id):
     return calculate_total_cost(transaction_id)
